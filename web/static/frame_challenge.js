@@ -126,7 +126,11 @@ class FrameChallenge {
     for (const bar of this.fixture.bars) {
       const a = this.answers[bar.id];
       const userShape = window.SHAPE_FROM_VALUES(a.start, a.end);
-      const ok = userShape === sol[bar.id];
+      // Solutions may carry magnitudes (e.g. '-1,-2') purely for ghost rendering;
+      // compare by sign pattern only so user answers with levels ±1 still match.
+      const [solVs, solVe] = sol[bar.id].split(',').map(Number);
+      const solShape = window.SHAPE_FROM_VALUES(solVs, solVe);
+      const ok = userShape === solShape;
       this.results[bar.id] = ok;
       if (ok) correct++;
     }

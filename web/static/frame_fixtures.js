@@ -114,11 +114,12 @@ const FRAME_FIXTURES = [
     welds: ['B', 'C'],
     loads: [{ kind: 'point', node: 'C', fx: 0, fy: 1, label: '√2F' }],
     solutions: {
-      // Reactions: V_A and V_D upward, H_A and H_D such that ∑M = 0
-      // Each diagonal bar carries axial+bending; M peaks at C
+      // Reactions: V_A and V_D upward, H_A = 0 (pin), H_D = 0 (roller vertical).
+      // Punktlast bei C -> M linear in jedem Stab, |M| maximal unter der Last in C.
+      // Daher BC und CD an C tiefer (Level -2), an Auflagern null -> Zelt-Form.
       N: { AB: '-1,-1', BC: '-1,-1', CD: '-1,-1' },
-      Q: { AB: '1,1',   BC: '1,-1',  CD: '-1,-1' },
-      M: { AB: '0,-1',  BC: '-1,-1', CD: '-1,0' },
+      Q: { AB: '1,1',   BC: '1,1',   CD: '-1,-1' },
+      M: { AB: '0,-1',  BC: '-1,-2', CD: '-2,0' },
     },
   },
 
@@ -179,9 +180,12 @@ const FRAME_FIXTURES = [
     solutions: {
       // Horizontal load F at B (top-left corner)
       // Approximate qualitative answers
-      N: { AB: '0,0',   BC: '-1,-1', CD: '0,0' },
-      Q: { AB: '-1,-1', BC: '1,1',   CD: '1,1' },
-      M: { AB: '-1,0',  BC: '-1,1',  CD: '0,1' },
+      // A=(0,0) pin, B=(0,h), C=(L,h), D=(L,0) roller; horizontale Kraft F nach rechts an B.
+      // Auflagerreaktionen (h=L=3): Ax=-F, Ay=-F, Dy=+F.
+      // Stiel CD trägt keine Horizontallast -> Q=0, M=0 konstant.
+      N: { AB: '-1,-1', BC: '0,0',  CD: '-1,-1' },
+      Q: { AB: '-1,-1', BC: '1,1',  CD: '0,0'   },
+      M: { AB: '0,-1',  BC: '-1,0', CD: '0,0'   },
     },
   },
 
