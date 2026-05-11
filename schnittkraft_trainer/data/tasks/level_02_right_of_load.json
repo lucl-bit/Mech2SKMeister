@@ -1,0 +1,34 @@
+{
+  "task_id": "level_02_right_of_load",
+  "title": "Schnitt rechts der Last",
+  "description": "Der gleiche Balken wie zuvor, aber die Schnittstelle liegt rechts der 10-kN-Last.",
+  "goal": "Achte besonders auf das Vorzeichen der Querkraft.",
+  "level": 2,
+  "points": 20,
+  "section_x": 3.0,
+  "beam": {
+    "type": "beam",
+    "title": "Einfeldträger mit Mittellast",
+    "length": 4.0,
+    "supports": [
+      {
+        "x": 0.0,
+        "support_type": "pin",
+        "label": "A"
+      },
+      {
+        "x": 4.0,
+        "support_type": "roller",
+        "label": "B"
+      }
+    ],
+    "point_loads": [
+      {
+        "type": "point_load",
+        "x": 2.0,
+        "force_y": -10.0,
+        "label": "P"
+      }
+    ]
+  }
+}

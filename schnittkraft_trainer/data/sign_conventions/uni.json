@@ -1,0 +1,6 @@
+{
+  "name": "Uni: Zug positiv, Q am linken Schnittufer nach oben positiv, hogging positiv",
+  "axial_positive": "tension",
+  "shear_positive_on_left_cut": "up",
+  "moment_positive": "hogging"
+}

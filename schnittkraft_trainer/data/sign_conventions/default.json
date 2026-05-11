@@ -1,0 +1,6 @@
+{
+  "name": "Default: Zug positiv, Q am linken Schnittufer nach oben positiv, sagging positiv",
+  "axial_positive": "tension",
+  "shear_positive_on_left_cut": "up",
+  "moment_positive": "sagging"
+}

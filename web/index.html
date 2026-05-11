@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mech2 Beanspruchungsmeister</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ===== MENU VIEW ===== -->
+<div id="menu-view" class="view">
+  <div class="menu-hero">
+    <h1>Mech2 Beanspruchungsmeister</h1>
+    <p class="hero-sub">Wähle deinen Modus.</p>
+  </div>
+  <div class="menu-cards">
+
+    <div class="card mode-card" onclick="App.showDiagramGame('basics')">
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <line x1="20" y1="40" x2="120" y2="40" stroke="#263447" stroke-width="5"/>
+          <polygon points="20,42 10,58 30,58" fill="#F8FAFE" stroke="#263447" stroke-width="2"/>
+          <line x1="5" y1="61" x2="35" y2="61" stroke="#263447" stroke-width="2"/>
+          <polygon points="120,42 110,58 130,58" fill="#F8FAFE" stroke="#263447" stroke-width="2"/>
+          <circle cx="113" cy="64" r="3" stroke="#263447" stroke-width="1.5" fill="none"/>
+          <circle cx="127" cy="64" r="3" stroke="#263447" stroke-width="1.5" fill="none"/>
+          <line x1="70" y1="10" x2="70" y2="33" stroke="#D9534F" stroke-width="3"/>
+          <polygon points="70,40 65,28 75,28" fill="#D9534F"/>
+          <polyline points="20,76 70,76 70,84 120,84" stroke="#7C5CE0" stroke-width="2.5" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#2F6FED"></div>
+      <h2>The Basics</h2>
+      <p>Grundlagen: Balken-Aufgaben für N, Q und M. Perfekt zum Einstieg.</p>
+      <button class="btn-accent" style="background:#2F6FED">Starten</button>
+    </div>
+
+    <div class="card mode-card" onclick="App.showDiagramGame('fachwerk')">
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <line x1="20" y1="70" x2="120" y2="70" stroke="#263447" stroke-width="3"/>
+          <line x1="20" y1="70" x2="50" y2="30" stroke="#263447" stroke-width="3"/>
+          <line x1="50" y1="30" x2="90" y2="30" stroke="#263447" stroke-width="3"/>
+          <line x1="50" y1="30" x2="70" y2="70" stroke="#263447" stroke-width="3"/>
+          <line x1="90" y1="30" x2="70" y2="70" stroke="#263447" stroke-width="3"/>
+          <line x1="90" y1="30" x2="120" y2="70" stroke="#263447" stroke-width="3"/>
+          <circle cx="20" cy="70" r="5" fill="#FBFDFF" stroke="#2F6FED" stroke-width="2"/>
+          <circle cx="50" cy="30" r="5" fill="#FBFDFF" stroke="#2F6FED" stroke-width="2"/>
+          <circle cx="70" cy="70" r="5" fill="#FBFDFF" stroke="#2F6FED" stroke-width="2"/>
+          <circle cx="90" cy="30" r="5" fill="#FBFDFF" stroke="#2F6FED" stroke-width="2"/>
+          <circle cx="120" cy="70" r="5" fill="#FBFDFF" stroke="#2F6FED" stroke-width="2"/>
+          <polygon points="20,72 10,82 30,82" fill="#F8FAFE" stroke="#263447" stroke-width="1.5"/>
+          <polygon points="120,72 110,82 130,82" fill="#F8FAFE" stroke="#263447" stroke-width="1.5"/>
+          <line x1="70" y1="84" x2="70" y2="76" stroke="#D9534F" stroke-width="2.5"/>
+          <polygon points="70,72 66,82 74,82" fill="#D9534F"/>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#7C5CE0"></div>
+      <h2>Fachwerk Profi</h2>
+      <p>Komplexere Fachwerke: Stabkräfte bestimmen, Nullstäbe finden.</p>
+      <button class="btn-accent" style="background:#7C5CE0">Starten</button>
+    </div>
+
+    <div class="card mode-card" onclick="App.showDiagramGame('speedrun')">
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <rect x="60" y="8" width="20" height="6" rx="2" fill="#D98634"/>
+          <line x1="70" y1="14" x2="70" y2="22" stroke="#D98634" stroke-width="3"/>
+          <circle cx="70" cy="52" r="28" fill="#FFF0DF" stroke="#D98634" stroke-width="3"/>
+          <line x1="70" y1="52" x2="70" y2="32" stroke="#263447" stroke-width="3" stroke-linecap="round"/>
+          <line x1="70" y1="52" x2="84" y2="46" stroke="#D9534F" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="70" cy="52" r="3" fill="#263447"/>
+          <line x1="70" y1="28" x2="70" y2="32" stroke="#D98634" stroke-width="2"/>
+          <line x1="94" y1="52" x2="90" y2="52" stroke="#D98634" stroke-width="2"/>
+          <line x1="50" y1="52" x2="46" y2="52" stroke="#D98634" stroke-width="2"/>
+          <line x1="70" y1="76" x2="70" y2="72" stroke="#D98634" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#D98634"></div>
+      <h2>Speed Run</h2>
+      <p>30 Sekunden pro Aufgabe. Ein Fehler oder Zeit abgelaufen → Game Over.</p>
+      <button class="btn-accent" style="background:#D98634">Starten</button>
+    </div>
+
+    <div class="card mode-card" onclick="App.showTrussBuilder()">
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <line x1="25" y1="68" x2="115" y2="68" stroke="#2E9D62" stroke-width="2.5" stroke-dasharray="5,3"/>
+          <line x1="25" y1="68" x2="70" y2="22" stroke="#2E9D62" stroke-width="2.5" stroke-dasharray="5,3"/>
+          <line x1="70" y1="22" x2="115" y2="68" stroke="#2E9D62" stroke-width="2.5" stroke-dasharray="5,3"/>
+          <line x1="70" y1="22" x2="70" y2="68" stroke="#2E9D62" stroke-width="2.5" stroke-dasharray="5,3"/>
+          <circle cx="25" cy="68" r="7" fill="#FBFDFF" stroke="#2E9D62" stroke-width="2.5"/>
+          <circle cx="70" cy="22" r="7" fill="#FBFDFF" stroke="#2E9D62" stroke-width="2.5"/>
+          <circle cx="115" cy="68" r="7" fill="#FBFDFF" stroke="#2E9D62" stroke-width="2.5"/>
+          <circle cx="70" cy="68" r="7" fill="#FBFDFF" stroke="#2E9D62" stroke-width="2.5"/>
+          <circle cx="95" cy="44" r="9" fill="#2E9D62"/>
+          <text x="95" y="49" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">+</text>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#2E9D62"></div>
+      <h2>Fachwerk bauen</h2>
+      <p>Knoten setzen, Stäbe verbinden, Lager und Lasten ergänzen. Stabkräfte berechnen.</p>
+      <button class="btn-accent" style="background:#2E9D62">Builder öffnen</button>
+    </div>
+
+  </div>
+
+  <footer class="disclaimer">
+    <strong>Disclaimer:</strong> Dieses Tool ist ein privates Lernhilfsmittel ohne offiziellen Bezug zu Vorlesungen, Skripten oder Prüfungen.
+    Lösungen, Vorzeichenkonventionen und Aufgaben können Fehler enthalten — verlasse dich nicht ausschliesslich darauf für die Prüfungsvorbereitung.
+    Der Autor übernimmt keine Haftung für Richtigkeit oder Folgen der Nutzung.
+    Fehler gefunden oder Feedback? Schreib an <a href="mailto:lukoll@ethz.ch">lukoll@ethz.ch</a>.
+  </footer>
+</div>
+
+<!-- ===== DIAGRAM GAME VIEW ===== -->
+<div id="game-view" class="view" style="display:none; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="App.showMenu()">← Menü</button>
+      <div>
+        <div class="topbar-title" id="game-mode-title">Verlauf-Spiel</div>
+        <div class="topbar-sub">Erkenne den richtigen Verlauf. x → rechts, y ↓ unten.</div>
+      </div>
+    </div>
+    <div class="kind-filter" id="game-kind-filter" style="display:none;">
+      <button data-k="mix" class="active">Gemischt</button>
+      <button data-k="N">Nur N</button>
+      <button data-k="Q">Nur Q</button>
+      <button data-k="M">Nur M</button>
+    </div>
+    <div class="topbar-right">
+      <div class="timer-display" id="game-timer" style="display:none;">30s</div>
+      <div class="points-display" id="game-points">0 Punkte</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span id="game-status">Aufgabe 1</span>
+    <span id="game-feedback" class="feedback-text"></span>
+  </div>
+  <div class="canvas-wrap" id="game-canvas-wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+  <div class="bottombar">
+    <button class="btn-accent" id="btn-next" onclick="App.diagramGame && App.diagramGame.nextChallenge()">Neue Aufgabe</button>
+  </div>
+
+  <!-- Explanation overlay (after answering wrong) -->
+  <div id="explanation-overlay" class="overlay" style="display:none;">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2 id="explanation-title">Warum ist das so?</h2>
+      </div>
+      <canvas id="explanation-canvas" width="640" height="240"></canvas>
+      <p id="explanation-text" class="explanation-text"></p>
+      <div class="overlay-actions">
+        <button class="btn-accent" onclick="App.diagramGame && App.diagramGame.dismissExplanation()">Verstanden →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over overlay (Speed Run) -->
+  <div id="gameover-overlay" class="overlay" style="display:none;">
+    <div class="overlay-panel">
+      <h2 style="color:var(--red); font-size:2rem;">Game Over!</h2>
+      <p id="gameover-reason" style="color:var(--muted); margin:8px 0;"></p>
+      <div class="gameover-score" id="gameover-score">0 Punkte</div>
+      <p id="gameover-streak" style="color:var(--muted); margin-bottom:18px;"></p>
+      <div class="overlay-actions">
+        <button class="btn-accent" style="background:var(--orange)" onclick="App.diagramGame && App.diagramGame.restart()">Nochmal versuchen</button>
+        <button class="btn-back" onclick="App.showMenu()">Zurück zum Menü</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TRUSS BUILDER VIEW ===== -->
+<div id="builder-view" class="view" style="display:none; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="App.showMenu()">← Menü</button>
+      <div>
+        <div class="topbar-title">Fachwerk bauen</div>
+        <div class="topbar-sub">Knoten setzen, Stäbe verbinden, Lager und Lasten ergänzen.</div>
+      </div>
+    </div>
+  </div>
+  <div class="builder-body">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-heading">Werkzeuge</div>
+        <div id="tool-buttons"></div>
+      </div>
+      <hr class="sidebar-divider">
+      <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.loadExample()">Beispiel-Fachwerk</button>
+      <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.clear()">Leeren</button>
+      <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.validate()">System prüfen</button>
+      <button class="btn-tool btn-solve" onclick="App.trussBuilder && App.trussBuilder.solve()">Berechnen</button>
+      <hr class="sidebar-divider">
+      <div class="sidebar-heading">Beanspruchung</div>
+      <div class="mode-buttons">
+        <button id="mode-M" class="btn-mode" onclick="App.trussBuilder && App.trussBuilder.setMode('M')" style="color:#D9534F">M</button>
+        <button id="mode-Q" class="btn-mode" onclick="App.trussBuilder && App.trussBuilder.setMode('Q')" style="color:#7C5CE0">Q</button>
+        <button id="mode-N" class="btn-mode btn-mode-active" onclick="App.trussBuilder && App.trussBuilder.setMode('N')" style="color:#2E9D62">N</button>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="builder-canvas-wrap">
+      <canvas id="builder-canvas"></canvas>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span id="builder-status">Werkzeug wählen und im Raster klicken.</span>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script src="/static/diagram_game.js"></script>
+<script src="/static/frame_fixtures.js"></script>
+<script src="/static/frame_challenge.js"></script>
+<script src="/static/truss_builder.js"></script>
+</body>
+</html>
