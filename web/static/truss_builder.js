@@ -458,13 +458,20 @@ class TrussBuilder {
     const nx = -uy, ny = ux;
     const normal = load.fx * ux + load.fy * uy;
     const shear  = load.fx * nx + load.fy * ny;
-    const moment = shear * len / this.SNAP;
+    // Auflagermoment (Reaktion gegen die Last) -- positives Vorzeichen entspricht
+    // CCW-Reaktion am Einspannknoten.
+    const reactionMz = shear * len / this.SNAP;
+    // Inneres Biegemoment M an der Einspannung hat das umgekehrte Vorzeichen
+    // (Konvention: M+ = Zug auf der "unteren" Faser bzw. +n-Seite des Stabes).
+    // Beim Kragträger mit Last am freien Ende ist die Zugfaser auf der Lastseite
+    // gegenüber -> M ist negativ.
+    const moment = -reactionMz;
     this.memberForces = {};
     this.beamResults = { [mem.bar_id]: { fixed_id: fixed.node_id, free_id: free.node_id, normal, shear, moment } };
     this.reactions = {
       [`rx:${fixed.node_id}`]: -load.fx,
       [`ry:${fixed.node_id}`]: -load.fy,
-      [`mz:${fixed.node_id}`]: moment,
+      [`mz:${fixed.node_id}`]: reactionMz,
     };
     this._setStatus('Kragträger berechnet: N/Q/M sind jetzt verfügbar.');
     this.redraw();
