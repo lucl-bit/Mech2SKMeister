@@ -32,13 +32,13 @@ class DiagramGame {
     this.gameOver = false;
     this._onClick = this._onClick.bind(this);
     this._onResize = this._onResize.bind(this);
-    canvas.addEventListener('click', this._onClick);
+    canvas.addEventListener('pointerup', this._onClick);
     window.addEventListener('resize', this._onResize);
   }
 
   destroy() {
     this._clearTimer();
-    this.canvas.removeEventListener('click', this._onClick);
+    this.canvas.removeEventListener('pointerup', this._onClick);
     window.removeEventListener('resize', this._onResize);
   }
 

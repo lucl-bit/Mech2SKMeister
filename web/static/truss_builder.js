@@ -46,18 +46,20 @@ class TrussBuilder {
     this._onRelease = this._onRelease.bind(this);
     this._onResize = this._onResize.bind(this);
     this._onKey = this._onKey.bind(this);
-    canvas.addEventListener('mousedown', this._onPress);
-    canvas.addEventListener('mousemove', this._onMove);
-    canvas.addEventListener('mouseup', this._onRelease);
+    canvas.addEventListener('pointerdown', this._onPress);
+    canvas.addEventListener('pointermove', this._onMove);
+    canvas.addEventListener('pointerup', this._onRelease);
+    canvas.addEventListener('pointercancel', this._onRelease);
     window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this._onKey);
     canvas.style.cursor = 'crosshair';
   }
 
   destroy() {
-    this.canvas.removeEventListener('mousedown', this._onPress);
-    this.canvas.removeEventListener('mousemove', this._onMove);
-    this.canvas.removeEventListener('mouseup', this._onRelease);
+    this.canvas.removeEventListener('pointerdown', this._onPress);
+    this.canvas.removeEventListener('pointermove', this._onMove);
+    this.canvas.removeEventListener('pointerup', this._onRelease);
+    this.canvas.removeEventListener('pointercancel', this._onRelease);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
   }
@@ -214,6 +216,8 @@ class TrussBuilder {
   }
 
   _onPress(e) {
+    if (e.pointerId !== undefined) this.canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
     const [mx, my] = this._pos(e);
     const x = this._snap(mx), y = this._snap(my);
     if (this.tool === 'node')        { this._pushUndo(); this._addNode(x, y); }

@@ -35,19 +35,19 @@ class FrameChallenge {
     this._onMove = this._onMove.bind(this);
     this._onUp = this._onUp.bind(this);
     this._onResize = this._onResize.bind(this);
-    canvas.addEventListener('mousedown', this._onDown);
-    canvas.addEventListener('mousemove', this._onMove);
-    canvas.addEventListener('mouseup', this._onUp);
-    canvas.addEventListener('mouseleave', this._onUp);
+    canvas.addEventListener('pointerdown', this._onDown);
+    canvas.addEventListener('pointermove', this._onMove);
+    canvas.addEventListener('pointerup', this._onUp);
+    canvas.addEventListener('pointercancel', this._onUp);
     window.addEventListener('resize', this._onResize);
     canvas.style.cursor = 'pointer';
   }
 
   destroy() {
-    this.canvas.removeEventListener('mousedown', this._onDown);
-    this.canvas.removeEventListener('mousemove', this._onMove);
-    this.canvas.removeEventListener('mouseup', this._onUp);
-    this.canvas.removeEventListener('mouseleave', this._onUp);
+    this.canvas.removeEventListener('pointerdown', this._onDown);
+    this.canvas.removeEventListener('pointermove', this._onMove);
+    this.canvas.removeEventListener('pointerup', this._onUp);
+    this.canvas.removeEventListener('pointercancel', this._onUp);
     window.removeEventListener('resize', this._onResize);
     const bar = document.getElementById('game-kind-filter');
     if (bar) bar.style.display = 'none';
@@ -224,6 +224,8 @@ class FrameChallenge {
     if (hit) {
       this.dragging = hit;
       this.canvas.style.cursor = 'grabbing';
+      if (e.pointerId !== undefined) this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
     }
   }
 
