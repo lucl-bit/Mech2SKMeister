@@ -83,6 +83,24 @@
       <button class="btn-accent" style="background:#D98634">Starten</button>
     </div>
 
+    <div class="card mode-card" onclick="App.showInertiaLab('mid')">
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <rect x="35" y="14" width="70" height="14" fill="#11A8B5" opacity="0.85"/>
+          <rect x="62" y="28" width="16" height="34" fill="#11A8B5" opacity="0.85"/>
+          <rect x="35" y="62" width="70" height="14" fill="#11A8B5" opacity="0.85"/>
+          <line x1="10" y1="45" x2="130" y2="45" stroke="#263447" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <line x1="70" y1="6" x2="70" y2="84" stroke="#263447" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <text x="124" y="42" font-size="9" fill="#263447" font-weight="bold">y</text>
+          <text x="73" y="12" font-size="9" fill="#263447" font-weight="bold">z</text>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#11A8B5"></div>
+      <h2>Inertia Lab</h2>
+      <p>Flächenträgheitsmoment I<sub>y</sub> üben: Querschnitt zerlegen, Steiner anwenden, Antwort wählen.</p>
+      <button class="btn-accent" style="background:#11A8B5">Starten</button>
+    </div>
+
     <div class="card mode-card" onclick="App.showTrussBuilder()">
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
@@ -224,10 +242,93 @@
   </div>
 </div>
 
+<!-- ===== INERTIA LAB VIEW ===== -->
+<div id="inertia-view" class="view" style="display:none; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="App.showMenu()">← Menü</button>
+      <div>
+        <div class="topbar-title" id="inertia-title">Inertia Lab</div>
+        <div class="topbar-sub">I<sub>y</sub> = Σ (I<sub>eigen,i</sub> + d<sub>i</sub>²·A<sub>i</sub>) · sign<sub>i</sub></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="points-display" id="inertia-points">0 Punkte</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span id="inertia-status">Lade Aufgabe…</span>
+  </div>
+  <div class="inertia-body">
+    <div class="canvas-wrap" id="inertia-canvas-wrap">
+      <canvas id="inertia-canvas"></canvas>
+    </div>
+    <div class="inertia-side" id="inertia-panel"></div>
+  </div>
+
+  <!-- Cheatsheet (einklappbar, rechter Bildschirmrand) -->
+  <button class="cheatsheet-tab" onclick="document.getElementById('cheatsheet-panel').classList.toggle('open')">📐 Formeln</button>
+  <aside id="cheatsheet-panel" class="cheatsheet-panel">
+    <div class="cheatsheet-head">
+      <strong>Querschnittskennwerte</strong>
+      <button class="cheatsheet-close" onclick="document.getElementById('cheatsheet-panel').classList.remove('open')">✕</button>
+    </div>
+    <table class="cheatsheet-table">
+      <thead><tr><th>Form</th><th>I<sub>T</sub></th><th>W<sub>T</sub></th><th>I<sub>y</sub></th><th>I<sub>z</sub></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><rect x="8" y="8" width="24" height="24" fill="none" stroke="#172033" stroke-width="1.5"/><text x="20" y="6" font-size="7" text-anchor="middle">h</text><text x="36" y="22" font-size="7">h</text></svg><br>Quadrat</td>
+          <td>0.141·h⁴</td><td>0.208·h³</td><td>h⁴/12</td><td>h⁴/12</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><rect x="4" y="12" width="32" height="16" fill="none" stroke="#172033" stroke-width="1.5"/><text x="20" y="10" font-size="7" text-anchor="middle">b</text><text x="38" y="22" font-size="7">h</text></svg><br>Rechteck</td>
+          <td>n.a.</td><td>n.a.</td><td>b³h/12</td><td>bh³/12</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><polygon points="6,32 34,32 20,6" fill="none" stroke="#172033" stroke-width="1.5"/><text x="20" y="38" font-size="7" text-anchor="middle">b</text><text x="36" y="20" font-size="7">h</text></svg><br>Dreieck</td>
+          <td>n.a.</td><td>n.a.</td><td>b³h/36</td><td>bh³/36</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><circle cx="20" cy="20" r="14" fill="none" stroke="#172033" stroke-width="1.5"/><line x1="20" y1="20" x2="32" y2="10" stroke="#172033" stroke-width="1"/><text x="28" y="13" font-size="7">R</text></svg><br>Kreis</td>
+          <td>πR⁴/2</td><td>πR³/2</td><td>πR⁴/4</td><td>πR⁴/4</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><ellipse cx="20" cy="20" rx="16" ry="9" fill="none" stroke="#172033" stroke-width="1.5"/><text x="35" y="21" font-size="7">a</text><text x="20" y="9" font-size="7" text-anchor="middle">b</text></svg><br>Ellipse</td>
+          <td>πa³b³/(a²+b²)</td><td>πab²/2</td><td>—</td><td>—</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><circle cx="20" cy="20" r="14" fill="none" stroke="#172033" stroke-width="1.5"/><circle cx="20" cy="20" r="10" fill="none" stroke="#172033" stroke-width="1.5"/><text x="32" y="14" font-size="7">R<tspan font-size="5">m</tspan></text></svg><br>Dünner Ring<br><small>R<sub>m</sub> » t</small></td>
+          <td>2πR<sub>m</sub>³·t</td><td>2πR<sub>m</sub>²·t</td><td>—</td><td>—</td>
+        </tr>
+        <tr>
+          <td><svg viewBox="0 0 40 40" width="36" height="36"><rect x="2" y="18" width="36" height="4" fill="none" stroke="#172033" stroke-width="1.5"/><text x="20" y="14" font-size="7" text-anchor="middle">h</text><text x="38" y="24" font-size="6">t</text></svg><br>Schmaler Streifen<br><small>h » t</small></td>
+          <td>ht³/3</td><td>ht²/3</td><td>—</td><td>—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cheatsheet-foot">
+      <strong>Steiner:</strong> I = I<sub>eigen</sub> + d²·A. Aussparungen mit negativem Vorzeichen. Bei doppelter Symmetrie liegt der Schwerpunkt im Schnittpunkt der Symmetrieachsen.
+    </div>
+  </aside>
+
+  <!-- Erklärung-Overlay -->
+  <div id="inertia-explanation-overlay" class="overlay" style="display:none;">
+    <div class="overlay-panel">
+      <div class="overlay-header"><h2>Lösungsweg</h2></div>
+      <pre id="inertia-explanation-text" class="explanation-text" style="white-space:pre-wrap; font-family:inherit;"></pre>
+      <div class="overlay-actions">
+        <button class="btn-accent" onclick="document.getElementById('inertia-explanation-overlay').style.display='none'">Verstanden →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 <script src="/static/diagram_game.js"></script>
 <script src="/static/frame_fixtures.js"></script>
 <script src="/static/frame_challenge.js"></script>
 <script src="/static/truss_builder.js"></script>
+<script src="/static/inertia_fixtures.js"></script>
+<script src="/static/inertia_lab.js"></script>
 </body>
 </html>
