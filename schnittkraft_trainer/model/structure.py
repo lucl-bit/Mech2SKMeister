@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from schnittkraft_trainer.model.load import PointLoad
+from schnittkraft_trainer.model.load import DistributedLoad, PointLoad
 from schnittkraft_trainer.model.support import Support
 
 
@@ -14,6 +14,7 @@ class Beam:
     supports: list[Support] = field(default_factory=list)
     point_loads: list[PointLoad] = field(default_factory=list)
     title: str = "Simple beam"
+    distributed_loads: list[DistributedLoad] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.length <= 0:
@@ -31,6 +32,12 @@ class Beam:
         for load in self.point_loads:
             if load.x > self.length:
                 raise ValueError(f"Point load {load.label} lies outside the beam.")
+
+        for q_load in self.distributed_loads:
+            if q_load.x_start < 0 or q_load.x_end > self.length:
+                raise ValueError(
+                    f"Distributed load {q_load.label} lies outside the beam."
+                )
 
         if len(self.supports) == 2:
             first, second = self.supports
@@ -57,21 +64,26 @@ class Beam:
             "length": self.length,
             "supports": [support.to_dict() for support in self.supports],
             "point_loads": [load.to_dict() for load in self.point_loads],
+            "distributed_loads": [q.to_dict() for q in self.distributed_loads],
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "Beam":
         supports_data = data.get("supports", [])
         loads_data = data.get("point_loads", [])
+        distributed_data = data.get("distributed_loads", [])
 
         if not isinstance(supports_data, list):
             raise ValueError("Beam supports must be a list.")
         if not isinstance(loads_data, list):
             raise ValueError("Beam point_loads must be a list.")
+        if not isinstance(distributed_data, list):
+            raise ValueError("Beam distributed_loads must be a list.")
 
         return cls(
             length=float(data["length"]),
             supports=[Support.from_dict(item) for item in supports_data],
             point_loads=[PointLoad.from_dict(item) for item in loads_data],
+            distributed_loads=[DistributedLoad.from_dict(item) for item in distributed_data],
             title=str(data.get("title", "Simple beam")),
         )

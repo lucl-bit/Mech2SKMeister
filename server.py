@@ -123,6 +123,10 @@ def _beam_to_dict(b: Beam) -> dict:
         "title": b.title,
         "supports": [{"x": s.x, "support_type": s.support_type.value, "label": s.label} for s in b.supports],
         "point_loads": [{"x": lv.x, "force_y": lv.force_y, "force_x": getattr(lv, "force_x", 0.0), "label": lv.label} for lv in b.point_loads],
+        "distributed_loads": [
+            {"x_start": q.x_start, "x_end": q.x_end, "q": q.q, "label": q.label}
+            for q in b.distributed_loads
+        ],
     }
 
 

@@ -66,6 +66,16 @@ def internal_forces_at(
             vertical_forces_left += load.force_y
             moment_about_section_left += load.force_y * (x - load.x)
 
+    for q_load in beam.distributed_loads:
+        if q_load.x_start >= x:
+            continue
+        end = min(q_load.x_end, x)
+        length = end - q_load.x_start
+        resultant = q_load.q * length
+        centroid = 0.5 * (q_load.x_start + end)
+        vertical_forces_left += resultant
+        moment_about_section_left += resultant * (x - centroid)
+
     normal_base = 0.0
     shear_base = vertical_forces_left
     moment_base = moment_about_section_left
