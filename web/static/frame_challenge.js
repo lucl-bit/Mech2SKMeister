@@ -50,7 +50,18 @@ class FrameChallenge {
     this.canvas.removeEventListener('pointercancel', this._onUp);
     window.removeEventListener('resize', this._onResize);
     const bar = document.getElementById('game-kind-filter');
-    if (bar) bar.style.display = 'none';
+    if (bar) {
+      bar.style.display = 'none';
+      bar.querySelectorAll('button').forEach(b => { b.onclick = null; });
+    }
+    // Restore bottombar so DiagramGame's original "Neue Aufgabe" button works
+    // again. Without this, FC's stale buttons stay in the DOM and their onclick
+    // closures (referencing this destroyed FC instance) hijack the shared canvas
+    // when the user switches into The Basics / Speed Run mode.
+    const bb = document.querySelector('#game-view .bottombar');
+    if (bb && this._origBottombarHTML !== undefined) {
+      bb.innerHTML = this._origBottombarHTML;
+    }
   }
 
   start() {
@@ -79,6 +90,7 @@ class FrameChallenge {
 
   _setupActions() {
     const bb = document.querySelector('#game-view .bottombar');
+    if (this._origBottombarHTML === undefined) this._origBottombarHTML = bb.innerHTML;
     bb.innerHTML = `
       <button class="btn-back" id="fc-solution">Lösung zeigen</button>
       <button class="btn-back" id="fc-clear">Zurücksetzen</button>

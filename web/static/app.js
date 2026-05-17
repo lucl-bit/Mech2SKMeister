@@ -25,6 +25,9 @@ const App = {
     document.getElementById('builder-view').style.display = 'none';
     const inertiaView = document.getElementById('inertia-view');
     if (inertiaView) inertiaView.style.display = 'none';
+    if (this.diagramGame)  { this.diagramGame.destroy();  this.diagramGame  = null; }
+    if (this.trussBuilder) { this.trussBuilder.destroy(); this.trussBuilder = null; }
+    if (this.inertiaLab)   { this.inertiaLab.destroy();   this.inertiaLab   = null; }
     const canvas = document.getElementById('game-canvas');
     const wrap   = document.getElementById('game-canvas-wrap');
     if (mode === 'fachwerk' && window.FrameChallenge) {
