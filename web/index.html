@@ -57,8 +57,8 @@
         </svg>
       </div>
       <div class="card-accent" style="background:#7C5CE0"></div>
-      <h2>Fachwerk Profi</h2>
-      <p>Komplexere Fachwerke: Stabkräfte bestimmen, Nullstäbe finden.</p>
+      <h2>Fachwerk Profi <span class="badge-new">Neu</span></h2>
+      <p>Komplexere Fachwerke: Stabkräfte bestimmen, Nullstäbe finden. Jetzt mit 15 Prüfungsaufgaben aus Altprüfungen 2020–2023.</p>
       <button class="btn-accent" style="background:#7C5CE0">Starten</button>
     </div>
 
@@ -225,6 +225,11 @@
       <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.clear()">Leeren</button>
       <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.validate()">System prüfen</button>
       <button class="btn-tool btn-solve" onclick="App.trussBuilder && App.trussBuilder.solve()">Berechnen</button>
+      <!-- dev-only buttons hidden
+      <button class="btn-tool btn-mode" id="btn-edit-solution" onclick="App.trussBuilder && App.trussBuilder.toggleEditMode()">✏ Beanspruchung bearbeiten</button>
+      <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.exportToCollection()">+ Zur Sammlung</button>
+      <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.downloadCollection()">Sammlung herunterladen</button>
+      -->
       <hr class="sidebar-divider">
       <div class="sidebar-heading">Beanspruchung</div>
       <div class="mode-buttons">

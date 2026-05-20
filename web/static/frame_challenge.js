@@ -30,6 +30,7 @@ class FrameChallenge {
     this.dragging = null;     // {barId, which: 'start'|'end'}
     this.hovering = null;
     this.showSolution = false;
+    this._computedSolution = null;
 
     this._onDown = this._onDown.bind(this);
     this._onMove = this._onMove.bind(this);
@@ -103,9 +104,12 @@ class FrameChallenge {
     document.getElementById('fc-next').onclick = () => this.nextChallenge();
   }
 
-  loadChallenge() {
+  async loadChallenge() {
     const fixes = window.FRAME_FIXTURES;
-    this.fixture = fixes[Math.floor(Math.random() * fixes.length)];
+    if (!this._queue || this._queue.length === 0) {
+      this._queue = [...fixes].sort(() => Math.random() - 0.5);
+    }
+    this.fixture = this._queue.pop();
     if (this.kindFilter && this.kindFilter !== 'mix') {
       this.kind = this.kindFilter;
     } else {
@@ -113,11 +117,119 @@ class FrameChallenge {
       this.kind = kinds[Math.floor(Math.random() * 3)];
     }
     this.answers = {};
-    for (const bar of this.fixture.bars) this.answers[bar.id] = { start: 0, end: 0 };
+    const paraM = this.fixture.parabolicBars?.M || [];
+    const paraQ = this.fixture.parabolicBars?.Q || [];
+    for (const bar of this.fixture.bars) {
+      const ans = { start: 0, end: 0 };
+      if (paraM.includes(bar.id) || paraQ.includes(bar.id)) ans.mid = 0;
+      this.answers[bar.id] = ans;
+    }
     this.results = null;
     this.showSolution = false;
+    this._computedSolution = null;
     this._updateStatus(`Aufgabe ${this.challengeNumber}: Zeichne den ${this.kind}-Verlauf. Ziehe die Endpunkte ◯ senkrecht zur Stabachse.`);
     this.draw();
+    await this._computeSolution();
+    this.draw();
+  }
+
+  async _computeSolution() {
+    const fix = this.fixture;
+    const isFrame = fix.welds && fix.welds.length > 0;
+    const distLoads = (fix.loads || []).filter(l => l.kind === 'distributed');
+    const hasDistributed = distLoads.length > 0;
+
+    const joints = Object.entries(fix.nodes).map(([id, n]) => ({
+      joint_id: id, x: Number(n.x), y: Number(n.y),
+    }));
+    const bars = fix.bars.map(b => ({ bar_id: b.id, start_id: b.from, end_id: b.to }));
+    const supports = Object.entries(fix.supports).map(([id, type]) => ({
+      joint_id: id, support_type: type,
+    }));
+    const loads = [];
+    const distributed_loads = [];
+    for (const ld of (fix.loads || [])) {
+      if (ld.kind === 'point') {
+        loads.push({ joint_id: ld.node, fx: Number(ld.fx) || 0, fy: Number(ld.fy) || 0 });
+      } else if (ld.kind === 'z') {
+        const sign = ld.direction === 'into' ? 1 : -1;
+        loads.push({ joint_id: ld.node, fx: 0, fy: sign * (Number(ld.fz) || 1) });
+      } else if (ld.kind === 'distributed') {
+        // Fixture y-down: q=1 means downward (positive local-y for horizontal bar) — pass as-is
+        distributed_loads.push({ bar_id: ld.bar, q: Number(ld.q) || 1 });
+      }
+    }
+
+    try {
+      let result;
+      // Use truss solver only for pure trusses (no distributed loads, no welds)
+      if (!isFrame && !hasDistributed) {
+        const resp = await fetch('/api/solve-truss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ joints, bars, loads, supports }),
+        });
+        result = await resp.json();
+        if (!result.ok) return;
+
+        const allN = fix.bars.map(b => Math.abs(result.bar_forces[b.id] || 0));
+        const thrN = 0.05 * Math.max(...allN, 1e-6);
+        const sgn = (v, thr) => Math.abs(v) < thr ? '0' : v > 0 ? '1' : '-1';
+        const sol = { N: {}, Q: {}, M: {} };
+        for (const b of fix.bars) {
+          const f = result.bar_forces[b.id] || 0;
+          sol.N[b.id] = `${sgn(f, thrN)},${sgn(f, thrN)}`;
+          sol.Q[b.id] = '0,0';
+          sol.M[b.id] = '0,0';
+        }
+        this._computedSolution = sol;
+      } else {
+        // Frame solver handles beams with distributed loads, welds, or both
+        const resp = await fetch('/api/solve-frame', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ joints, bars, supports, loads, welds: fix.welds || [], distributed_loads }),
+        });
+        result = await resp.json();
+        if (!result.ok) return;
+
+        const bf = result.bar_forces;
+        const pick = (key) => fix.bars.flatMap(b => bf[b.id] ? [Math.abs(bf[b.id][key])] : []);
+        const thr = (vals) => 0.05 * Math.max(...vals, 1e-6);
+        const thrN = thr(pick('N_start').concat(pick('N_end')));
+        const thrQ = thr(pick('Q_start').concat(pick('Q_end')));
+        const thrM = thr(pick('M_start').concat(pick('M_end')));
+        const sgn = (v, t) => Math.abs(v) < t ? '0' : v > 0 ? '1' : '-1';
+        const sol = { N: {}, Q: {}, M: {} };
+        for (const b of fix.bars) {
+          const f = bf[b.id];
+          if (!f) continue;
+          sol.N[b.id] = `${sgn(f.N_start, thrN)},${sgn(f.N_end, thrN)}`;
+          sol.Q[b.id] = `${sgn(f.Q_start, thrQ)},${sgn(f.Q_end, thrQ)}`;
+          sol.M[b.id] = `${sgn(f.M_start, thrM)},${sgn(f.M_end, thrM)}`;
+        }
+
+        // Compute midpoint M for parabolic bars: M(L/2) = M_start + Q_start*(L/2) - q*(L/2)²/2
+        const parabolicM = fix.parabolicBars?.M || [];
+        if (parabolicM.length) {
+          sol.M_mid = {};
+          for (const b of fix.bars) {
+            if (!parabolicM.includes(b.id)) continue;
+            const f = bf[b.id]; if (!f) continue;
+            const dl = distLoads.find(l => l.bar === b.id);
+            const q = dl ? Number(dl.q) : 0;
+            const n1 = fix.nodes[b.from], n2 = fix.nodes[b.to];
+            const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+            const M_mid = f.M_start + f.Q_start * (L / 2) - q * (L / 2) ** 2 / 2;
+            const thrMid = 0.05 * Math.max(Math.abs(M_mid), 1e-6);
+            sol.M_mid[b.id] = Math.abs(M_mid) < thrMid ? '0' : M_mid > 0 ? '1' : '-1';
+          }
+        }
+        this._computedSolution = sol;
+      }
+    } catch (e) {
+      console.warn('_computeSolution failed:', e);
+    }
   }
 
   nextChallenge() {
@@ -126,23 +238,39 @@ class FrameChallenge {
   }
 
   clearAnswers() {
-    for (const bar of this.fixture.bars) this.answers[bar.id] = { start: 0, end: 0 };
+    const paraM = this.fixture.parabolicBars?.M || [];
+    const paraQ = this.fixture.parabolicBars?.Q || [];
+    for (const bar of this.fixture.bars) {
+      const ans = { start: 0, end: 0 };
+      if (paraM.includes(bar.id) || paraQ.includes(bar.id)) ans.mid = 0;
+      this.answers[bar.id] = ans;
+    }
     this.results = null;
     this.draw();
   }
 
   checkAll() {
-    const sol = this.fixture.solutions[this.kind];
+    const fullSol = this._computedSolution || this.fixture.solutions;
+    const sol = fullSol[this.kind];
+    const solMid = fullSol[this.kind + '_mid'];  // e.g. M_mid, Q_mid
+    const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
     this.results = {};
     let correct = 0;
     for (const bar of this.fixture.bars) {
       const a = this.answers[bar.id];
-      const userShape = window.SHAPE_FROM_VALUES(a.start, a.end);
-      // Solutions may carry magnitudes (e.g. '-1,-2') purely for ghost rendering;
-      // compare by sign pattern only so user answers with levels ±1 still match.
-      const [solVs, solVe] = sol[bar.id].split(',').map(Number);
-      const solShape = window.SHAPE_FROM_VALUES(solVs, solVe);
-      const ok = userShape === solShape;
+      const isPara = paraForKind.includes(bar.id) && solMid?.[bar.id];
+      let ok;
+      if (isPara) {
+        // For parabolic bars: only check the midpoint sign (endpoints are trivially 0)
+        const midSol = solMid[bar.id];
+        const midUser = a.mid > 0 ? '1' : a.mid < 0 ? '-1' : '0';
+        ok = midUser === midSol;
+      } else {
+        const userShape = window.SHAPE_FROM_VALUES(a.start, a.end);
+        const [solVs, solVe] = sol[bar.id].split(',').map(Number);
+        const solShape = window.SHAPE_FROM_VALUES(solVs, solVe);
+        ok = userShape === solShape;
+      }
       this.results[bar.id] = ok;
       if (ok) correct++;
     }
@@ -214,14 +342,24 @@ class FrameChallenge {
   _handlePos(barId, which) {
     const { s, e, nx, ny } = this._barAxes(barId);
     const a = this.answers[barId];
+    if (which === 'mid') {
+      const mid = [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2];
+      const val = a.mid || 0;
+      return [mid[0] + nx * val * LEVEL_STEP, mid[1] + ny * val * LEVEL_STEP];
+    }
     const val = which === 'start' ? a.start : a.end;
     const base = which === 'start' ? s : e;
     return [base[0] + nx * val * LEVEL_STEP, base[1] + ny * val * LEVEL_STEP];
   }
 
   _hitTestHandles(mx, my) {
+    const paraM = this.fixture.parabolicBars?.M || [];
+    const paraQ = this.fixture.parabolicBars?.Q || [];
     for (const bar of this.fixture.bars) {
-      for (const which of ['start', 'end']) {
+      const hasMid = (paraM.includes(bar.id) && this.kind === 'M') ||
+                     (paraQ.includes(bar.id) && this.kind === 'Q');
+      const whichList = hasMid ? ['start', 'mid', 'end'] : ['start', 'end'];
+      for (const which of whichList) {
         const [px, py] = this._handlePos(bar.id, which);
         if (Math.hypot(px - mx, py - my) < HANDLE_RADIUS + 6) return { barId: bar.id, which };
       }
@@ -247,7 +385,9 @@ class FrameChallenge {
     if (this.dragging) {
       const { barId, which } = this.dragging;
       const { s, e: end, nx, ny } = this._barAxes(barId);
-      const base = which === 'start' ? s : end;
+      let base;
+      if (which === 'mid') base = [(s[0] + end[0]) / 2, (s[1] + end[1]) / 2];
+      else base = which === 'start' ? s : end;
       // Project (mouse - base) onto normal axis
       const proj = (mx - base[0]) * nx + (my - base[1]) * ny;
       const level = Math.max(-MAX_LEVEL, Math.min(MAX_LEVEL, Math.round(proj / LEVEL_STEP)));
@@ -309,7 +449,10 @@ class FrameChallenge {
     ctx.fillStyle = FC.text; ctx.font = 'bold 16px Helvetica';
     ctx.fillText(`-Verlauf zeichnen — ${this.fixture.title}`, 92, 45);
     ctx.fillStyle = FC.muted; ctx.font = '12px Helvetica';
-    ctx.fillText(this.fixture.description, 92, 64);
+    const desc = this.fixture.source
+      ? `${this.fixture.description}  [${this.fixture.source}]`
+      : this.fixture.description;
+    ctx.fillText(desc, 92, 64);
     ctx.fillStyle = FC.muted; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'right';
     ctx.fillText('Ziehe die Endpunkte der Verläufe ◯ senkrecht zur Stabachse.', w - 42, 50);
     ctx.textAlign = 'left';
@@ -476,43 +619,56 @@ class FrameChallenge {
 
   _drawAnswers() {
     const defaultColor = this._diagramColor();
+    const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
     for (const bar of this.fixture.bars) {
       const a = this.answers[bar.id];
       const { s, e, nx, ny } = this._barAxes(bar.id);
-      const sx = s[0] + nx * a.start * LEVEL_STEP;
-      const sy = s[1] + ny * a.start * LEVEL_STEP;
-      const ex = e[0] + nx * a.end * LEVEL_STEP;
-      const ey = e[1] + ny * a.end * LEVEL_STEP;
-      const ctx = this.ctx;
+      const isPara = paraForKind.includes(bar.id) && a.mid !== undefined;
 
       let color = defaultColor, fillAlpha = '22';
       if (this.results && this.results[bar.id] !== undefined) {
-        if (this.results[bar.id]) { color = FC.green; fillAlpha = '38'; }
-        else { color = FC.red; fillAlpha = '38'; }
+        color = this.results[bar.id] ? FC.green : FC.red;
+        fillAlpha = '38';
       }
-      ctx.fillStyle = color + fillAlpha;
-      ctx.beginPath();
-      ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = color; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-      ctx.strokeStyle = color + '88'; ctx.lineWidth = 1;
-      const segs = 5;
-      for (let i = 0; i <= segs; i++) {
-        const t = i / segs;
-        const bx = s[0] + (e[0] - s[0]) * t, by = s[1] + (e[1] - s[1]) * t;
-        const cx = sx + (ex - sx) * t, cy = sy + (ey - sy) * t;
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(cx, cy); ctx.stroke();
+      const ctx = this.ctx;
+
+      if (isPara) {
+        // Draw parabolic shape using quadratic bezier through start, midpoint (offset by mid), end
+        const midX = (s[0] + e[0]) / 2, midY = (s[1] + e[1]) / 2;
+        const cpX = midX + nx * a.mid * LEVEL_STEP, cpY = midY + ny * a.mid * LEVEL_STEP;
+        // Filled region
+        ctx.fillStyle = color + fillAlpha;
+        ctx.beginPath();
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]);
+        ctx.quadraticCurveTo(cpX, cpY, s[0], s[1]);
+        ctx.fill();
+        // Parabolic outline
+        ctx.strokeStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(cpX, cpY, e[0], e[1]); ctx.stroke();
+      } else {
+        const sx = s[0] + nx * a.start * LEVEL_STEP, sy = s[1] + ny * a.start * LEVEL_STEP;
+        const ex = e[0] + nx * a.end * LEVEL_STEP,   ey = e[1] + ny * a.end * LEVEL_STEP;
+        ctx.fillStyle = color + fillAlpha;
+        ctx.beginPath();
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = color + '88'; ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+          const t = i / 5;
+          const bx = s[0] + (e[0] - s[0]) * t, by = s[1] + (e[1] - s[1]) * t;
+          const cx2 = sx + (ex - sx) * t, cy2 = sy + (ey - sy) * t;
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(cx2, cy2); ctx.stroke();
+        }
       }
 
-      // After check: badge + status text on bar midpoint, OUTSIDE the diagram
+      // After check: badge on bar midpoint
       if (this.results && this.results[bar.id] !== undefined) {
         const ok = this.results[bar.id];
         const mb = [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2];
-        const off = -28; // opposite side of the diagram
-        const sign = a.start + a.end >= 0 ? -1 : 1;
-        const bx = mb[0] + nx * off * sign;
-        const by = mb[1] + ny * off * sign;
+        const sign = (isPara ? a.mid : a.start + a.end) >= 0 ? -1 : 1;
+        const bx = mb[0] + nx * (-28) * sign, by = mb[1] + ny * (-28) * sign;
         ctx.fillStyle = ok ? FC.green : FC.red;
         ctx.strokeStyle = '#FFF'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(bx, by, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -523,54 +679,81 @@ class FrameChallenge {
   }
 
   _drawSolutionGhost() {
-    const sol = this.fixture.solutions[this.kind];
+    const fullSol = this._computedSolution || this.fixture.solutions;
+    const sol = fullSol[this.kind];
+    const solMid = fullSol[this.kind + '_mid'];
+    const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
     const ctx = this.ctx;
+    const GS = LEVEL_STEP * 1.6;  // ghost scale
+
+    const tag = (px, py, v) => {
+      const txt = v > 0 ? '+' : (v < 0 ? '−' : '0');
+      ctx.fillStyle = FC.paper; ctx.strokeStyle = FC.green; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = FC.green; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
+      ctx.fillText(txt, px, py + 4); ctx.textAlign = 'left';
+    };
+
     for (const bar of this.fixture.bars) {
       const shape = sol[bar.id];
-      const [vs, ve] = shape.split(',').map(Number);
       const { s, e, nx, ny } = this._barAxes(bar.id);
-      // Use a smaller perpendicular offset (don't multiply) so the ghost overlays the actual answer area cleanly
-      const ghostScale = 1.0;
-      const sx = s[0] + nx * vs * ghostScale * LEVEL_STEP * 1.6;
-      const sy = s[1] + ny * vs * ghostScale * LEVEL_STEP * 1.6;
-      const ex = e[0] + nx * ve * ghostScale * LEVEL_STEP * 1.6;
-      const ey = e[1] + ny * ve * ghostScale * LEVEL_STEP * 1.6;
-      // Filled "correct answer" band with strong outline + label
-      ctx.fillStyle = '#2E9D6233';
-      ctx.beginPath();
-      ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = FC.green; ctx.lineWidth = 3; ctx.setLineDash([7, 4]);
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = FC.green;
-      ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
-      // Endpoint signs
-      const tag = (px, py, v) => {
-        const txt = v > 0 ? '+' : (v < 0 ? '−' : '0');
-        ctx.fillStyle = FC.paper; ctx.strokeStyle = FC.green; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = FC.green; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
-        ctx.fillText(txt, px, py + 4); ctx.textAlign = 'left';
-      };
-      tag(sx, sy, vs); tag(ex, ey, ve);
+      const isPara = paraForKind.includes(bar.id) && solMid?.[bar.id];
+
+      if (isPara) {
+        const vm = Number(solMid[bar.id]);  // -1, 0, or 1
+        const midX = (s[0] + e[0]) / 2, midY = (s[1] + e[1]) / 2;
+        const cpX = midX + nx * vm * GS, cpY = midY + ny * vm * GS;
+        ctx.fillStyle = '#2E9D6233';
+        ctx.beginPath();
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]);
+        ctx.quadraticCurveTo(cpX, cpY, s[0], s[1]);
+        ctx.fill();
+        ctx.strokeStyle = FC.green; ctx.lineWidth = 3; ctx.setLineDash([7, 4]);
+        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(cpX, cpY, e[0], e[1]); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = FC.green;
+        ctx.beginPath(); ctx.arc(cpX, cpY, 6, 0, Math.PI * 2); ctx.fill();
+        tag(cpX, cpY, vm);
+      } else {
+        const [vs, ve] = shape.split(',').map(Number);
+        const sx = s[0] + nx * vs * GS, sy = s[1] + ny * vs * GS;
+        const ex = e[0] + nx * ve * GS, ey = e[1] + ny * ve * GS;
+        ctx.fillStyle = '#2E9D6233';
+        ctx.beginPath();
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = FC.green; ctx.lineWidth = 3; ctx.setLineDash([7, 4]);
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = FC.green;
+        ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+        tag(sx, sy, vs); tag(ex, ey, ve);
+      }
     }
   }
 
   _drawHandles() {
     const color = this._diagramColor();
+    const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
     for (const bar of this.fixture.bars) {
-      for (const which of ['start', 'end']) {
+      const hasMid = paraForKind.includes(bar.id) && this.answers[bar.id].mid !== undefined;
+      const whichList = hasMid ? ['start', 'mid', 'end'] : ['start', 'end'];
+      for (const which of whichList) {
         const [px, py] = this._handlePos(bar.id, which);
         const val = this.answers[bar.id][which];
+        const isMid = which === 'mid';
         const fill = val === 0 ? FC.paper : (val > 0 ? FC.green : FC.orange);
         const ctx = this.ctx;
-        ctx.fillStyle = fill; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(px, py, HANDLE_RADIUS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        const r = isMid ? HANDLE_RADIUS + 2 : HANDLE_RADIUS;
+        ctx.fillStyle = fill; ctx.strokeStyle = isMid ? FC.red : color; ctx.lineWidth = isMid ? 3 : 2.5;
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         if (val !== 0) {
           ctx.fillStyle = '#FFF'; ctx.font = 'bold 10px Helvetica'; ctx.textAlign = 'center';
           ctx.fillText(val > 0 ? '+' : '−', px, py + 3); ctx.textAlign = 'left';
+        } else if (isMid) {
+          ctx.fillStyle = FC.red; ctx.font = 'bold 9px Helvetica'; ctx.textAlign = 'center';
+          ctx.fillText('mid', px, py + 3); ctx.textAlign = 'left';
         }
       }
     }
