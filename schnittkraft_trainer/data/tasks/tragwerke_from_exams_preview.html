@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<title>Extrahierte Tragwerke aus Altprüfungen</title>
+<style>
+body { font-family: -apple-system, sans-serif; margin: 20px; background: #f4f5f7; }
+h1 { margin-bottom: 8px; }
+.summary { color: #555; margin-bottom: 20px; }
+.card { background: #fff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.card header { padding: 10px 14px; border-bottom: 1px solid #eee; }
+.card header h3 { margin: 0; }
+.card header small { color: #888; }
+.card .body { display: flex; gap: 20px; padding: 12px 14px; flex-wrap: wrap; align-items: flex-start; }
+.card .figure { flex: 0 0 auto; }
+.card dl { display: grid; grid-template-columns: 90px 1fr; gap: 4px 12px; margin: 0; font-size: 13px; min-width: 320px; }
+.card dt { color: #666; }
+.card dd { margin: 0; word-break: break-word; }
+code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Extrahierte Tragwerke aus Altprüfungen</h1>
+<p class="summary">18 Aufgaben &middot; 18 OK &middot; 0 verworfen.</p>
+
+<article class="card">
+  <header>
+    <h3>Deformierbares Tragwerk mit Balkenelementen</h3>
+    <small>FS 2023.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="138.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="138.0" y1="138.0" x2="242.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="138.0" x2="346.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="138.0" x2="242.0" y2="242.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><circle cx="138.0" cy="138.0" r="4" fill="#1976d2"/><text x="144.0" y="132.0" font-size="12" fill="#333">B</text><circle cx="242.0" cy="138.0" r="4" fill="#1976d2"/><text x="248.0" y="132.0" font-size="12" fill="#333">C</text><circle cx="346.0" cy="138.0" r="4" fill="#1976d2"/><text x="352.0" y="132.0" font-size="12" fill="#333">D</text><polygon points="346.0,142.0 338.0,156.0 354.0,156.0" fill="#d32f2f" opacity="0.85"/><text x="346.0" y="168.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="242.0" cy="242.0" r="4" fill="#1976d2"/><text x="248.0" y="236.0" font-size="12" fill="#333">E</text><polygon points="242.0,246.0 234.0,260.0 250.0,260.0" fill="#d32f2f" opacity="0.85"/><text x="242.0" y="272.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><line x1="34.0" y1="66.0" x2="34.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="38.0" y="70.0" font-size="11" fill="#e65100">F</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2023_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,1.0), C(2.0,1.0), D(3.0,1.0), E(2.0,2.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:C-E</dd>
+      <dt>Auflager</dt><dd>D/pin, E/pin</dd>
+      <dt>Lasten</dt><dd>F@A(0,F) F</dd>
+      <dt>Notizen</dt><dd>Geschweisstes Tragwerk mit Balkenelementen unter Vertikalkraft an Stelle A.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Statisch bestimmtes System II unter Streckenlast q</h3>
+    <small>FS 2020.pdf · Frage C1 · Seite 10 · <code>beam</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="246.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">C</text><polygon points="34.0,38.0 26.0,52.0 42.0,52.0" fill="#d32f2f" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="246.0" cy="34.0" r="4" fill="#1976d2"/><text x="252.0" y="28.0" font-size="12" fill="#333">D</text><polygon points="246.0,38.0 238.0,52.0 254.0,52.0" fill="#0288d1" opacity="0.85"/><text x="246.0" y="64.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><text x="140.0" y="26.0" font-size="11" text-anchor="middle" fill="#1565c0">▼▼▼ q</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2020_fragec1</code></dd>
+      <dt>Knoten</dt><dd>C(0.0,0.0), D(1.0,0.0)</dd>
+      <dt>Stäbe</dt><dd>1:C-D</dd>
+      <dt>Auflager</dt><dd>C/pin, D/roller_y</dd>
+      <dt>Lasten</dt><dd>q on m1=q perpendicular q</dd>
+      <dt>Notizen</dt><dd>Biegemomentenverlauf M_z(x) im Bereich C-D für verschiedene Antwortmöglichkeiten gezeigt.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Statisch bestimmtes Tragwerk mit kombinierter Beanspruchung</h3>
+    <small>FS 2020.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="175.3" y2="34.0" stroke="#222" stroke-width="3"/><line x1="175.3" y1="34.0" x2="175.3" y2="104.7" stroke="#222" stroke-width="3"/><line x1="175.3" y1="104.7" x2="175.3" y2="246.0" stroke="#222" stroke-width="3"/><line x1="175.3" y1="246.0" x2="34.0" y2="246.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="246.0" x2="34.0" y2="104.7" stroke="#222" stroke-width="3"/><line x1="34.0" y1="104.7" x2="34.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="175.3" cy="34.0" r="4" fill="#1976d2"/><text x="181.3" y="28.0" font-size="12" fill="#333">A</text><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="34.0" cy="104.7" r="4" fill="#1976d2"/><text x="40.0" y="98.7" font-size="12" fill="#333">C</text><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">D</text><circle cx="175.3" cy="246.0" r="4" fill="#1976d2"/><text x="181.3" y="240.0" font-size="12" fill="#333">E</text><circle cx="175.3" cy="104.7" r="4" fill="#1976d2"/><text x="181.3" y="98.7" font-size="12" fill="#333">F</text><circle cx="175.3" cy="175.3" r="4" fill="#1976d2"/><text x="181.3" y="169.3" font-size="12" fill="#333">G</text><rect x="165.3" y="179.3" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="175.3" y="205.3" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><line x1="175.3" y1="66.0" x2="175.3" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="179.3" y="70.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2020_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(2.0,0.0), B(0.0,0.0), C(0.0,1.0), D(0.0,3.0), E(2.0,3.0), F(2.0,1.0), G(2.0,2.0)</dd>
+      <dt>Stäbe</dt><dd>1:B-A, 2:A-F, 3:F-E, 4:E-D, 5:D-C, 6:C-B</dd>
+      <dt>Auflager</dt><dd>G/fixed</dd>
+      <dt>Lasten</dt><dd>F@A(0,P) P</dd>
+      <dt>Notizen</dt><dd>Durchgehender, vierfach abgewinkelter Träger mit Biegung und Torsion.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Rahmentragwerk mit Biegung und Normalkraft</h3>
+    <small>HS 2020.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="175.3" y2="34.0" stroke="#222" stroke-width="3"/><line x1="175.3" y1="34.0" x2="316.7" y2="34.0" stroke="#222" stroke-width="3"/><line x1="316.7" y1="34.0" x2="316.7" y2="246.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="175.3" cy="34.0" r="4" fill="#1976d2"/><text x="181.3" y="28.0" font-size="12" fill="#333">B</text><circle cx="316.7" cy="34.0" r="4" fill="#1976d2"/><text x="322.7" y="28.0" font-size="12" fill="#333">C</text><circle cx="316.7" cy="246.0" r="4" fill="#1976d2"/><text x="322.7" y="240.0" font-size="12" fill="#333">D</text><polygon points="316.7,250.0 308.7,264.0 324.7,264.0" fill="#0288d1" opacity="0.85"/><text x="316.7" y="276.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><text x="246.0" y="26.0" font-size="11" text-anchor="middle" fill="#1565c0">▼▼▼ q</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2020_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,0.0), C(2.0,0.0), D(2.0,1.5)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D</dd>
+      <dt>Auflager</dt><dd>A/fixed, D/roller_y</dd>
+      <dt>Lasten</dt><dd>q on m2=q global_y q</dd>
+      <dt>Notizen</dt><dd>Dreigelenkrahmen mit Streckenlast auf Riegel B-C, alle Balken gleiche Steifigkeiten.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Statisch unbestimmtes Tragwerk mit Kraft am Punkt B</h3>
+    <small>HS 2020.pdf · Frage C1 · Seite 9 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="190.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="190.0" y1="34.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="190.0" x2="34.0" y2="190.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><polygon points="34.0,38.0 26.0,52.0 42.0,52.0" fill="#d32f2f" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="190.0" cy="34.0" r="4" fill="#1976d2"/><text x="196.0" y="28.0" font-size="12" fill="#333">E</text><circle cx="346.0" cy="34.0" r="4" fill="#1976d2"/><text x="352.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="34.0" cy="190.0" r="4" fill="#1976d2"/><text x="40.0" y="184.0" font-size="12" fill="#333">D</text><circle cx="34.0" cy="190.0" r="4" fill="#1976d2"/><text x="40.0" y="184.0" font-size="12" fill="#333">C</text><line x1="346.0" y1="66.0" x2="346.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="350.0" y="70.0" font-size="11" fill="#e65100">√(2F) at 45°</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2020_fragec1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), E(1.0,0.0), B(2.0,0.0), D(0.0,1.0), C(0.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-E, 2:E-B, 3:D-C</dd>
+      <dt>Auflager</dt><dd>A/pin</dd>
+      <dt>Lasten</dt><dd>F@B(F,F) √(2F) at 45°</dd>
+      <dt>Notizen</dt><dd>Zweifach abgewinkelter Balken A-B-C-D mit 45°-geneigter Kraft √(2F) am Punkt B.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Dreifach abgewinkelter Träger A-B-C-D-E mit Biegung und Torsion</h3>
+    <small>HS 2020.pdf · Frage D1 · Seite 11 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="140.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="34.0" x2="140.0" y2="140.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="140.0" x2="34.0" y2="246.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="246.0" x2="34.0" y2="246.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="140.0" cy="34.0" r="4" fill="#1976d2"/><text x="146.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="140.0" cy="140.0" r="4" fill="#1976d2"/><text x="146.0" y="134.0" font-size="12" fill="#333">C</text><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">D</text><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">E</text><line x1="34.0" y1="278.0" x2="34.0" y2="246.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="38.0" y="282.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2020_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,0.0), C(1.0,1.0), D(0.0,2.0), E(0.0,2.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/fixed</dd>
+      <dt>Lasten</dt><dd>F@E(0,P) P</dd>
+      <dt>Notizen</dt><dd>Dreifach abgewinkelter Träger mit Biegesteifigkeit EI und Torsionssteifigkeit GIr in allen Abschnitten.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Rahmen mit Kragarm und Gleichstreckenlast</h3>
+    <small>FS 2021.pdf · Frage B1 · Seite 7 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="246.0" x2="140.0" y2="140.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="140.0" x2="140.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="140.0" x2="193.0" y2="140.0" stroke="#222" stroke-width="3"/><line x1="193.0" y1="140.0" x2="246.0" y2="140.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">A</text><polygon points="34.0,250.0 26.0,264.0 42.0,264.0" fill="#d32f2f" opacity="0.85"/><text x="34.0" y="276.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="140.0" cy="140.0" r="4" fill="#1976d2"/><text x="146.0" y="134.0" font-size="12" fill="#333">B</text><circle cx="140.0" cy="34.0" r="4" fill="#1976d2"/><text x="146.0" y="28.0" font-size="12" fill="#333">C</text><circle cx="193.0" cy="140.0" r="4" fill="#1976d2"/><text x="199.0" y="134.0" font-size="12" fill="#333">D</text><circle cx="246.0" cy="140.0" r="4" fill="#1976d2"/><text x="252.0" y="134.0" font-size="12" fill="#333">E</text><polygon points="246.0,144.0 238.0,158.0 254.0,158.0" fill="#0288d1" opacity="0.85"/><text x="246.0" y="170.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><line x1="140.0" y1="66.0" x2="140.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="144.0" y="70.0" font-size="11" fill="#e65100">F</text><text x="219.5" y="132.0" font-size="11" text-anchor="middle" fill="#1565c0">▼▼▼ q</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2021_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,2.0), B(1.0,1.0), C(1.0,0.0), D(1.5,1.0), E(2.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:B-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/pin, E/roller_y</dd>
+      <dt>Lasten</dt><dd>F@C(0,F) F, q on m4=2F/l global_y q</dd>
+      <dt>Notizen</dt><dd>Rahmen mit drei Balken an Punkt B verschweißt, Kragarm DE mit Gleichstreckenlast.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Zweifach abgewinkelter Träger A-B-C-D mit Kraft und Torsion</h3>
+    <small>FS 2021.pdf · Frage D1 · Seite 13 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="140.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="34.0" x2="34.0" y2="246.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="246.0" x2="246.0" y2="246.0" stroke="#222" stroke-width="3"/><circle cx="140.0" cy="34.0" r="4" fill="#1976d2"/><text x="146.0" y="28.0" font-size="12" fill="#333">A</text><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">C</text><circle cx="246.0" cy="246.0" r="4" fill="#1976d2"/><text x="252.0" y="240.0" font-size="12" fill="#333">D</text><rect x="236.0" y="250.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="246.0" y="276.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><line x1="140.0" y1="66.0" x2="140.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="144.0" y="70.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2021_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(1.0,0.0), B(0.0,0.0), C(0.0,2.0), D(2.0,2.0)</dd>
+      <dt>Stäbe</dt><dd>1:B-A, 2:A-C, 3:C-D</dd>
+      <dt>Auflager</dt><dd>D/fixed</dd>
+      <dt>Lasten</dt><dd>F@A(0,P) P</dd>
+      <dt>Notizen</dt><dd>Zweifach abgewinkelter Rahmen mit Biegung und Torsion; Kraft P in z-Richtung wirkt bei A.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Tragwerk mit vier Balken und Gleichstreckenlast</h3>
+    <small>HS 2021.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="112.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="112.0" y1="34.0" x2="190.0" y2="112.0" stroke="#222" stroke-width="3"/><line x1="190.0" y1="112.0" x2="268.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="268.0" y1="34.0" x2="346.0" y2="112.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="112.0" cy="34.0" r="4" fill="#1976d2"/><text x="118.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="190.0" cy="112.0" r="4" fill="#1976d2"/><text x="196.0" y="106.0" font-size="12" fill="#333">C</text><circle cx="268.0" cy="34.0" r="4" fill="#1976d2"/><text x="274.0" y="28.0" font-size="12" fill="#333">D</text><circle cx="346.0" cy="112.0" r="4" fill="#1976d2"/><text x="352.0" y="106.0" font-size="12" fill="#333">E</text><polygon points="346.0,116.0 338.0,130.0 354.0,130.0" fill="#0288d1" opacity="0.85"/><text x="346.0" y="142.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><text x="73.0" y="26.0" font-size="11" text-anchor="middle" fill="#1565c0">▼▼▼ q=F/l</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2021_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,0.0), C(2.0,1.0), D(3.0,0.0), E(4.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/fixed, E/roller_y</dd>
+      <dt>Lasten</dt><dd>q on m1=F/l perpendicular q=F/l</dd>
+      <dt>Notizen</dt><dd>Vier gelenkig verbundene Balken mit Gleichstreckenlast im Abschnitt A-B, statisch bestimmt.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Träger A-B-C-D-E mit Biegung und Torsion</h3>
+    <small>HS 2021.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="138.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="138.0" y1="34.0" x2="242.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="34.0" x2="242.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="138.0" x2="346.0" y2="138.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="138.0" cy="34.0" r="4" fill="#1976d2"/><text x="144.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="242.0" cy="34.0" r="4" fill="#1976d2"/><text x="248.0" y="28.0" font-size="12" fill="#333">C</text><circle cx="242.0" cy="138.0" r="4" fill="#1976d2"/><text x="248.0" y="132.0" font-size="12" fill="#333">D</text><circle cx="346.0" cy="138.0" r="4" fill="#1976d2"/><text x="352.0" y="132.0" font-size="12" fill="#333">E</text><line x1="346.0" y1="170.0" x2="346.0" y2="138.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="350.0" y="174.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2021_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,0.0), C(2.0,0.0), D(2.0,1.0), E(3.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/fixed</dd>
+      <dt>Lasten</dt><dd>F@E(0.0,P) P</dd>
+      <dt>Notizen</dt><dd>Dreiachsiges Tragwerk mit kombinierter Beanspruchung (Biegung und Torsion) in allen geraden Abschnitten.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Tragwerk A-B-C-D mit Vertikallast an C</h3>
+    <small>FS 2022.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="138.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="138.0" y1="138.0" x2="242.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="34.0" x2="346.0" y2="138.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="138.0" cy="138.0" r="4" fill="#1976d2"/><text x="144.0" y="132.0" font-size="12" fill="#333">B</text><circle cx="242.0" cy="34.0" r="4" fill="#1976d2"/><text x="248.0" y="28.0" font-size="12" fill="#333">C</text><circle cx="346.0" cy="138.0" r="4" fill="#1976d2"/><text x="352.0" y="132.0" font-size="12" fill="#333">D</text><polygon points="346.0,142.0 338.0,156.0 354.0,156.0" fill="#0288d1" opacity="0.85"/><text x="346.0" y="168.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><line x1="242.0" y1="66.0" x2="242.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="246.0" y="70.0" font-size="11" fill="#e65100">√2F</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2022_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,1.0), C(2.0,0.0), D(3.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D</dd>
+      <dt>Auflager</dt><dd>A/fixed, D/roller_y</dd>
+      <dt>Lasten</dt><dd>F@C(0,√2F) √2F</dd>
+      <dt>Notizen</dt><dd>Ebenes Tragwerk mit biegesteifer Verbindung; alle Balkenelemente haben Biegesteifigkeit EI und Dehnsteifigkeit EA.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Träger A-B-C-D mit Biegung und Torsion</h3>
+    <small>FS 2022.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="34.0" x2="34.0" y2="190.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="190.0" x2="190.0" y2="190.0" stroke="#222" stroke-width="3"/><circle cx="346.0" cy="34.0" r="4" fill="#1976d2"/><text x="352.0" y="28.0" font-size="12" fill="#333">A</text><polygon points="346.0,38.0 338.0,52.0 354.0,52.0" fill="#d32f2f" opacity="0.85"/><text x="346.0" y="64.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="34.0" cy="190.0" r="4" fill="#1976d2"/><text x="40.0" y="184.0" font-size="12" fill="#333">C</text><circle cx="190.0" cy="190.0" r="4" fill="#1976d2"/><text x="196.0" y="184.0" font-size="12" fill="#333">D</text><line x1="190.0" y1="222.0" x2="190.0" y2="190.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="194.0" y="226.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2022_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(2.0,0.0), B(0.0,0.0), C(0.0,1.0), D(1.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:B-A, 2:B-C, 3:C-D</dd>
+      <dt>Auflager</dt><dd>A/pin</dd>
+      <dt>Lasten</dt><dd>F@D(0.0,P) P</dd>
+      <dt>Notizen</dt><dd>Ebener Träger mit Biegung und Torsion; Kraft P wirkt in positiver globaler y-Richtung an Punkt D.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Verformung am statisch bestimmten Tragwerk A-B-C-D-E</h3>
+    <small>HS 2022.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="246.0" x2="140.0" y2="140.0" stroke="#222" stroke-width="3"/><line x1="140.0" y1="140.0" x2="246.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="246.0" y1="34.0" x2="246.0" y2="246.0" stroke="#222" stroke-width="3"/><line x1="246.0" y1="246.0" x2="140.0" y2="246.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="246.0" r="4" fill="#1976d2"/><text x="40.0" y="240.0" font-size="12" fill="#333">A</text><polygon points="34.0,250.0 26.0,264.0 42.0,264.0" fill="#d32f2f" opacity="0.85"/><text x="34.0" y="276.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="140.0" cy="140.0" r="4" fill="#1976d2"/><text x="146.0" y="134.0" font-size="12" fill="#333">B</text><circle cx="246.0" cy="34.0" r="4" fill="#1976d2"/><text x="252.0" y="28.0" font-size="12" fill="#333">C</text><circle cx="246.0" cy="246.0" r="4" fill="#1976d2"/><text x="252.0" y="240.0" font-size="12" fill="#333">D</text><circle cx="140.0" cy="246.0" r="4" fill="#1976d2"/><text x="146.0" y="240.0" font-size="12" fill="#333">E</text><polygon points="140.0,250.0 132.0,264.0 148.0,264.0" fill="#d32f2f" opacity="0.85"/><text x="140.0" y="276.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><line x1="246.0" y1="66.0" x2="246.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="250.0" y="70.0" font-size="11" fill="#e65100">F</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2022_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,2.0), B(1.0,1.0), C(2.0,0.0), D(2.0,2.0), E(1.0,2.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/pin, E/pin</dd>
+      <dt>Lasten</dt><dd>F@C(-F,0) F</dd>
+      <dt>Notizen</dt><dd>Ebenes Rahmentragwerk mit horizontaler Last an Knoten C; Bestimmung von Schnittgrößen und Verformungen.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Rahmen mit Biegemomentenbeanspruchungen</h3>
+    <small>HS 2022.pdf · Frage B3 · Seite 7 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="246.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">B</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="246.0" cy="34.0" r="4" fill="#1976d2"/><text x="252.0" y="28.0" font-size="12" fill="#333">C</text><circle cx="34.0" cy="34.0" r="12" fill="none" stroke="#7b1fa2" stroke-width="2"/><text x="48.0" y="38.0" font-size="11" fill="#7b1fa2">M_B</text><circle cx="246.0" cy="34.0" r="12" fill="none" stroke="#7b1fa2" stroke-width="2"/><text x="260.0" y="38.0" font-size="11" fill="#7b1fa2">M_C</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2022_frageb3</code></dd>
+      <dt>Knoten</dt><dd>B(0.0,0.0), C(1.0,0.0)</dd>
+      <dt>Stäbe</dt><dd>1:B-C</dd>
+      <dt>Auflager</dt><dd>B/fixed</dd>
+      <dt>Lasten</dt><dd>M@B=M_B M_B, M@C=M_C M_C</dd>
+      <dt>Notizen</dt><dd>Zweigelenkiger Rahmen unter Biegemomentenbeanspruchung; Berechnung der horizontalen Verschiebung am Kraftangriffspunkt C.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Rahmen A-B-C-D mit Biegung und Torsion</h3>
+    <small>HS 2022.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="34.0" y2="242.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="242.0" x2="242.0" y2="242.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="242.0" x2="242.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="34.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><rect x="24.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="34.0" cy="242.0" r="4" fill="#1976d2"/><text x="40.0" y="236.0" font-size="12" fill="#333">B</text><circle cx="242.0" cy="242.0" r="4" fill="#1976d2"/><text x="248.0" y="236.0" font-size="12" fill="#333">C</text><circle cx="242.0" cy="34.0" r="4" fill="#1976d2"/><text x="248.0" y="28.0" font-size="12" fill="#333">D</text><circle cx="346.0" cy="34.0" r="4" fill="#1976d2"/><text x="352.0" y="28.0" font-size="12" fill="#333">E</text><line x1="346.0" y1="66.0" x2="346.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="350.0" y="70.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2022_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(0.0,1.0), C(1.0,1.0), D(1.0,0.0), E(1.5,0.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/fixed</dd>
+      <dt>Lasten</dt><dd>F@E(0.0,P) P</dd>
+      <dt>Notizen</dt><dd>Biegesteifigkeit EI und Torsionssteifigkeit GIₜ in allen Abschnitten; Aufgabe D1 fragt nach dem Torsionsmoment im Balkenabschnitt B-C.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Dreifach abgewinkelter Träger A-B-C-D-E mit Biegung &amp; Torsion</h3>
+    <small>FS 2023.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="112.0" x2="112.0" y2="190.0" stroke="#222" stroke-width="3"/><line x1="112.0" y1="190.0" x2="190.0" y2="190.0" stroke="#222" stroke-width="3"/><line x1="190.0" y1="190.0" x2="268.0" y2="112.0" stroke="#222" stroke-width="3"/><line x1="268.0" y1="112.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="112.0" r="4" fill="#1976d2"/><text x="40.0" y="106.0" font-size="12" fill="#333">A</text><rect x="24.0" y="116.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="142.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="112.0" cy="190.0" r="4" fill="#1976d2"/><text x="118.0" y="184.0" font-size="12" fill="#333">B</text><circle cx="190.0" cy="190.0" r="4" fill="#1976d2"/><text x="196.0" y="184.0" font-size="12" fill="#333">C</text><circle cx="268.0" cy="112.0" r="4" fill="#1976d2"/><text x="274.0" y="106.0" font-size="12" fill="#333">D</text><circle cx="346.0" cy="34.0" r="4" fill="#1976d2"/><text x="352.0" y="28.0" font-size="12" fill="#333">E</text><line x1="346.0" y1="66.0" x2="346.0" y2="34.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="350.0" y="70.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>fs2023_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(1.0,1.0), C(2.0,1.0), D(3.0,0.0), E(4.0,-1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E</dd>
+      <dt>Auflager</dt><dd>A/fixed</dd>
+      <dt>Lasten</dt><dd>F@E(0,P) P</dd>
+      <dt>Notizen</dt><dd>In x-y-Ebene liegender Träger mit kombinierter Biegung und Torsion, Biegesteifigkeit EI und Torsionssteifigkeit GIT in allen Abschnitten.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Tragwerk mit vier geraden Balken unter geneigter Kraft</h3>
+    <small>HS 2023.pdf · Frage B1 · Seite 6 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="34.0" y1="34.0" x2="34.0" y2="104.7" stroke="#222" stroke-width="3"/><line x1="34.0" y1="104.7" x2="34.0" y2="175.3" stroke="#222" stroke-width="3"/><line x1="34.0" y1="104.7" x2="104.7" y2="104.7" stroke="#222" stroke-width="3"/><line x1="104.7" y1="104.7" x2="175.3" y2="104.7" stroke="#222" stroke-width="3"/><line x1="175.3" y1="104.7" x2="175.3" y2="246.0" stroke="#222" stroke-width="3"/><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">A</text><polygon points="34.0,38.0 26.0,52.0 42.0,52.0" fill="#d32f2f" opacity="0.85"/><text x="34.0" y="64.0" font-size="9" text-anchor="middle" fill="#d32f2f">pin</text><circle cx="34.0" cy="104.7" r="4" fill="#1976d2"/><text x="40.0" y="98.7" font-size="12" fill="#333">B</text><circle cx="34.0" cy="175.3" r="4" fill="#1976d2"/><text x="40.0" y="169.3" font-size="12" fill="#333">C</text><rect x="24.0" y="179.3" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="34.0" y="205.3" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="104.7" cy="104.7" r="4" fill="#1976d2"/><text x="110.7" y="98.7" font-size="12" fill="#333">D</text><circle cx="175.3" cy="104.7" r="4" fill="#1976d2"/><text x="181.3" y="98.7" font-size="12" fill="#333">E</text><circle cx="175.3" cy="246.0" r="4" fill="#1976d2"/><text x="181.3" y="240.0" font-size="12" fill="#333">F</text><polygon points="175.3,250.0 167.3,264.0 183.3,264.0" fill="#0288d1" opacity="0.85"/><text x="175.3" y="276.0" font-size="9" text-anchor="middle" fill="#0288d1">roller_y</text><line x1="175.3" y1="278.0" x2="175.3" y2="246.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="179.3" y="282.0" font-size="11" fill="#e65100">√(2P)</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2023_frageb1</code></dd>
+      <dt>Knoten</dt><dd>A(0.0,0.0), B(0.0,1.0), C(0.0,2.0), D(1.0,1.0), E(2.0,1.0), F(2.0,3.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:B-D, 4:D-E, 5:E-F</dd>
+      <dt>Auflager</dt><dd>A/pin, C/fixed, F/roller_y</dd>
+      <dt>Lasten</dt><dd>F@F(√(2P),0) √(2P)</dd>
+      <dt>Notizen</dt><dd>Tragwerk mit vier Balken unter um 45° geneigter Kraft mit Magnitude √(2P).</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+<article class="card">
+  <header>
+    <h3>Statisch bestimmtes Tragwerk mit kombinierter Beanspruchung</h3>
+    <small>HS 2023.pdf · Frage D1 · Seite 12 · <code>frame</code></small>
+  </header>
+  <div class="body">
+    <div class="figure"><svg width="380" height="280" viewBox="0 0 380 280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fafafa" stroke="#ddd"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker></defs><line x1="242.0" y1="34.0" x2="34.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="34.0" x2="34.0" y2="242.0" stroke="#222" stroke-width="3"/><line x1="34.0" y1="242.0" x2="242.0" y2="242.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="242.0" x2="346.0" y2="242.0" stroke="#222" stroke-width="3"/><line x1="346.0" y1="242.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><line x1="242.0" y1="242.0" x2="138.0" y2="138.0" stroke="#222" stroke-width="3"/><line x1="138.0" y1="138.0" x2="346.0" y2="34.0" stroke="#222" stroke-width="3"/><circle cx="242.0" cy="34.0" r="4" fill="#1976d2"/><text x="248.0" y="28.0" font-size="12" fill="#333">A</text><rect x="232.0" y="38.0" width="20" height="6" fill="#6a1b9a" opacity="0.85"/><text x="242.0" y="64.0" font-size="9" text-anchor="middle" fill="#6a1b9a">fixed</text><circle cx="34.0" cy="34.0" r="4" fill="#1976d2"/><text x="40.0" y="28.0" font-size="12" fill="#333">B</text><circle cx="34.0" cy="242.0" r="4" fill="#1976d2"/><text x="40.0" y="236.0" font-size="12" fill="#333">C</text><circle cx="242.0" cy="242.0" r="4" fill="#1976d2"/><text x="248.0" y="236.0" font-size="12" fill="#333">D</text><circle cx="346.0" cy="242.0" r="4" fill="#1976d2"/><text x="352.0" y="236.0" font-size="12" fill="#333">E</text><circle cx="346.0" cy="34.0" r="4" fill="#1976d2"/><text x="352.0" y="28.0" font-size="12" fill="#333">F</text><circle cx="138.0" cy="138.0" r="4" fill="#1976d2"/><text x="144.0" y="132.0" font-size="12" fill="#333">G</text><line x1="138.0" y1="170.0" x2="138.0" y2="138.0" stroke="#e65100" stroke-width="2" marker-end="url(#arrow)"/><text x="142.0" y="174.0" font-size="11" fill="#e65100">P</text></svg></div>
+    <dl>
+      <dt>task_id</dt><dd><code>hs2023_fraged1</code></dd>
+      <dt>Knoten</dt><dd>A(2.0,0.0), B(0.0,0.0), C(0.0,2.0), D(2.0,2.0), E(3.0,2.0), F(3.0,0.0), G(1.0,1.0)</dd>
+      <dt>Stäbe</dt><dd>1:A-B, 2:B-C, 3:C-D, 4:D-E, 5:E-F, 6:D-G, 7:G-F</dd>
+      <dt>Auflager</dt><dd>A/fixed</dd>
+      <dt>Lasten</dt><dd>F@G(0.0,P) P</dd>
+      <dt>Notizen</dt><dd>Träger A-B-C-D-E-F-G mit Biegung und Torsion; gekrümmter Abschnitt D-E-F-G mit Radius R=l.</dd>
+      <dt>Status</dt><dd style="color:#388e3c"><b>pending</b> </dd>
+    </dl>
+  </div>
+</article>
+</body>
+</html>
