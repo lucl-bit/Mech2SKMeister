@@ -507,21 +507,37 @@ class FrameChallenge {
   _drawSupports() {
     for (const [id, type] of Object.entries(this.fixture.supports || {})) {
       const [x, y] = this.pixelNodes[id];
-      if (type === 'fixed') this._drawFixedSupport(x, y);
+      if (type === 'fixed') this._drawFixedSupport(x, y, this._fixedSupportMirrored(id, x));
       else if (type === 'pin') this._drawPin(x, y);
       else if (type === 'roller') this._drawRoller(x, y);
     }
   }
 
-  _drawFixedSupport(x, y) {
+  // Mirror the fixed-support symbol (wall on the right) when the attached bar
+  // runs predominantly to the left, so the bar doesn't disappear into the wall.
+  _fixedSupportMirrored(id, x) {
+    for (const bar of this.fixture.bars || []) {
+      let other = null;
+      if (bar.from === id) other = bar.to;
+      else if (bar.to === id) other = bar.from;
+      if (!other) continue;
+      const [ox, oy] = this.pixelNodes[other];
+      const dx = ox - x, dy = oy - this.pixelNodes[id][1];
+      if (dx < 0 && Math.abs(dx) > Math.abs(dy)) return true;
+    }
+    return false;
+  }
+
+  _drawFixedSupport(x, y, mirror = false) {
     const ctx = this.ctx;
-    const wx = x - 18;
+    const s = mirror ? -1 : 1;
+    const wx = x - 18 * s;
     ctx.strokeStyle = FC.beam; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(wx, y - 36); ctx.lineTo(wx, y + 36); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(x + 4, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(x + 4 * s, y); ctx.stroke();
     ctx.lineWidth = 1.5;
     for (let off = -34; off <= 38; off += 10) {
-      ctx.beginPath(); ctx.moveTo(wx - 14, y + off + 8); ctx.lineTo(wx, y + off); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(wx - 14 * s, y + off + 8); ctx.lineTo(wx, y + off); ctx.stroke();
     }
   }
 

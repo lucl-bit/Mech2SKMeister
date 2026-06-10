@@ -233,27 +233,6 @@ const FRAME_FIXTURES = [
   },
 
   // ============================================================
-  // FS 2020 – Frage D1: Statisch bestimmtes Tragwerk mit kombinierter Beanspruchung
-  // ============================================================
-  {
-    id: 'fs2020_fraged1',
-    title: 'Vierfach abgewinkelter Träger mit Einspannung',
-    description: 'Durchgehender, vierfach abgewinkelter Träger mit kombinierter Beanspruchung, Einspannung bei G.',
-    source: 'FS 2020 – Frage D1',
-    bbox: { w: 4.0, h: 5.0 },
-    nodes: { A: { x: 3.0, y: 4.0 }, B: { x: 1.0, y: 4.0 }, C: { x: 1.0, y: 3.0 }, D: { x: 1.0, y: 1.0 }, E: { x: 3.0, y: 1.0 }, F: { x: 3.0, y: 3.0 }, G: { x: 3.0, y: 2.0 } },
-    bars: [ { id: 'BA', from: 'B', to: 'A' }, { id: 'AF', from: 'A', to: 'F' }, { id: 'FE', from: 'F', to: 'E' }, { id: 'ED', from: 'E', to: 'D' }, { id: 'DC', from: 'D', to: 'C' }, { id: 'CB', from: 'C', to: 'B' } ],
-    supports: { G: 'fixed' },
-    welds: ['B', 'A', 'F', 'E', 'D', 'C'],
-    loads: [ { kind: 'point', node: 'A', fx: 0, fy: 1, label: 'P' } ],
-    solutions: {
-      N: { BA: '0,0', AF: '-1,-1', FE: '0,0', ED: '0,0', DC: '0,0', CB: '0,0' },
-      Q: { BA: '-1,-1', AF: '0,0', FE: '1,1', ED: '-1,-1', DC: '1,1', CB: '1,1' },
-      M: { BA: '1,-1', AF: '-1,0', FE: '-1,1', ED: '1,-1', DC: '-1,1', CB: '0,1' },
-    },
-  },
-
-  // ============================================================
   // HS 2020 – Frage B1: Rahmentragwerk mit Biegung und Normalkraft
   // ============================================================
   {

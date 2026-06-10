@@ -3,7 +3,7 @@ import json, sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from frame_solver import parse_task, solve_frame, sign_pattern
 
-SKIP = {'hs2020_fragec1', 'hs2020_fraged1', 'hs2022_frageb3'}
+SKIP = {'hs2020_fragec1', 'hs2020_fraged1', 'hs2022_frageb3', 'fs2020_fraged1'}
 
 SUPPORT_MAP = {'fixed': 'fixed', 'pin': 'pin', 'roller_y': 'roller', 'roller_x': 'roller'}
 
