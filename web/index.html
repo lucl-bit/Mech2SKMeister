@@ -143,6 +143,12 @@
 
   </div>
 
+  <div class="bug-report-banner scoreboard-banner" onclick="Scoreboard.open()">
+    <span class="bug-report-icon">🏆</span>
+    <span>Bestenliste — Highscores aller Modi</span>
+    <button class="btn-bug-report" type="button">Öffnen</button>
+  </div>
+
   <div class="bug-report-banner">
     <span class="bug-report-icon">🐛</span>
     <span>Found a bug?</span>
@@ -218,11 +224,37 @@
       <h2 style="color:var(--red); font-size:2rem;">Game Over!</h2>
       <p id="gameover-reason" style="color:var(--muted); margin:8px 0;"></p>
       <div class="gameover-score" id="gameover-score">0 Punkte</div>
-      <p id="gameover-streak" style="color:var(--muted); margin-bottom:18px;"></p>
+      <p id="gameover-streak" style="color:var(--muted); margin-bottom:6px;"></p>
+      <div id="gameover-highscore" class="gameover-highscore" style="display:none;">
+        <p class="gameover-rank" id="gameover-rank"></p>
+        <div class="gameover-name-row">
+          <input id="gameover-name" type="text" maxlength="24" placeholder="Dein Name">
+          <button class="btn-accent" id="gameover-submit" type="button">Eintragen</button>
+        </div>
+      </div>
       <div class="overlay-actions">
+        <button class="btn-back" onclick="Scoreboard.open('speedrun')">Bestenliste</button>
         <button class="btn-accent" style="background:var(--orange)" onclick="App.diagramGame && App.diagramGame.restart()">Nochmal versuchen</button>
         <button class="btn-back" onclick="App.showMenu()">Zurück zum Menü</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCOREBOARD OVERLAY ===== -->
+<div id="scoreboard-overlay" class="overlay" style="display:none;" onclick="if (event.target === this) Scoreboard.close()">
+  <div class="overlay-panel">
+    <div class="overlay-header scoreboard-head">
+      <h2>🏆 Bestenliste</h2>
+      <label class="scoreboard-namefield">
+        <span>Dein Name</span>
+        <input id="scoreboard-name" type="text" maxlength="24" placeholder="Anonym">
+      </label>
+    </div>
+    <div class="kind-filter scoreboard-tabs" id="scoreboard-tabs"></div>
+    <div id="scoreboard-body"></div>
+    <div class="overlay-actions">
+      <button class="btn-accent" onclick="Scoreboard.close()">Schliessen</button>
     </div>
   </div>
 </div>
@@ -353,6 +385,7 @@
 </div>
 
 <script src="/static/theme.js"></script>
+<script src="/static/scoreboard.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/diagram_game.js"></script>
 <script src="/static/frame_fixtures.js"></script>

@@ -40,6 +40,8 @@ class FrameChallenge {
   }
 
   destroy() {
+    // Session-Ende: Punktestand still in die Bestenliste übernehmen
+    if (window.Scoreboard) Scoreboard.submitQuiet('fachwerk', this.points, { streak: this.streak });
     this.canvas.removeEventListener('pointerdown', this._onDown);
     this.canvas.removeEventListener('pointermove', this._onMove);
     this.canvas.removeEventListener('pointerup', this._onUp);

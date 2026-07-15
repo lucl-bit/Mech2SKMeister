@@ -35,6 +35,11 @@ class DiagramGame {
     this._clearTimer();
     this.canvas.removeEventListener('pointerup', this._onClick);
     window.removeEventListener('resize', this._onResize);
+    // Session-Ende: Basics-Punktestand still in die Bestenliste übernehmen
+    // (Speed Run trägt sich über den Game-Over-Screen ein).
+    if (this.mode === 'basics' && window.Scoreboard) {
+      Scoreboard.submitQuiet('basics', this.points, { streak: this.streak });
+    }
   }
 
   start() {
@@ -135,9 +140,12 @@ class DiagramGame {
     const isCorrect = optionId === this.challenge.correct_option_id;
     this._clearTimer();
     if (isCorrect) {
-      this.points += 100;
       this.streak++;
-      this._setFeedback('✓ Richtig! ' + this.challenge.explanation, C.green);
+      // Streak-Bonus: ab 3 richtigen in Folge gibt es +25 obendrauf
+      const bonus = this.streak >= 3 ? 25 : 0;
+      this.points += 100 + bonus;
+      const bonusText = bonus ? ` (+${100 + bonus}, Streak ×${this.streak} 🔥)` : '';
+      this._setFeedback('✓ Richtig!' + bonusText + ' ' + this.challenge.explanation, C.green);
       this._saveProgress(true);
       this.draw();
       if (this.mode === 'speedrun') {
@@ -166,7 +174,32 @@ class DiagramGame {
     document.getElementById('gameover-score').textContent = this.points + ' Punkte';
     document.getElementById('gameover-streak').textContent =
       'Du hast ' + this.streak + ' Aufgabe' + (this.streak === 1 ? '' : 'n') + ' in Folge richtig gelöst.';
+    this._setupHighscoreEntry();
     document.getElementById('gameover-overlay').style.display = 'flex';
+  }
+
+  // Highscore-Eintrag im Game-Over-Screen (Speed Run)
+  _setupHighscoreEntry() {
+    const box = document.getElementById('gameover-highscore');
+    if (!box || !window.Scoreboard) return;
+    const rankEl = document.getElementById('gameover-rank');
+    const nameEl = document.getElementById('gameover-name');
+    const submitEl = document.getElementById('gameover-submit');
+    const rank = Scoreboard.placement('speedrun', this.points);
+    if (rank === null) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    rankEl.textContent = `Highscore geknackt — Platz ${rank} der Bestenliste!`;
+    nameEl.style.display = ''; submitEl.style.display = '';
+    nameEl.value = Scoreboard.playerName();
+    const finalScore = this.points, finalStreak = this.streak;
+    submitEl.onclick = () => {
+      Scoreboard.setPlayerName(nameEl.value);
+      const placed = Scoreboard.submit('speedrun', nameEl.value, finalScore, { streak: finalStreak });
+      rankEl.textContent = placed !== null
+        ? `Eingetragen: Platz ${placed} für ${nameEl.value.trim() || 'Anonym'}.`
+        : 'Eingetragen.';
+      nameEl.style.display = 'none'; submitEl.style.display = 'none';
+    };
   }
 
   _hideGameover() { document.getElementById('gameover-overlay').style.display = 'none'; }
@@ -380,8 +413,8 @@ class DiagramGame {
   }
 
   _updateStatus() {
-    const label = this.mode === 'speedrun'
-      ? `Aufgabe ${this.challengeNumber} • Streak ${this.streak}`
+    const label = this.streak >= 2
+      ? `Aufgabe ${this.challengeNumber} • Streak ${this.streak} 🔥`
       : `Aufgabe ${this.challengeNumber}`;
     document.getElementById('game-status').textContent = label;
     const el = document.getElementById('game-points');

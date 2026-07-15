@@ -43,6 +43,8 @@ class InertiaLab {
     window.removeEventListener('resize', this._onResize);
     const ov = document.getElementById('inertia-explanation-overlay');
     if (ov) ov.style.display = 'none';
+    // Session-Ende: Punktestand still in die Bestenliste übernehmen
+    if (window.Scoreboard) Scoreboard.submitQuiet('inertia', this.points);
   }
 
   _onResize() { this._resize(); this._draw(); }

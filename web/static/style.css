@@ -376,6 +376,38 @@ select {
   font-size: .82rem; line-height: 1.5; color: var(--ink); border-left: 3px solid var(--teal);
 }
 
+/* ---- SCOREBOARD ---- */
+.scoreboard-banner { cursor: pointer; transition: border-color .15s; }
+.scoreboard-banner:hover { border-color: var(--ink); }
+.scoreboard-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.scoreboard-namefield { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.scoreboard-namefield input, .gameover-name-row input {
+  padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 5px;
+  font-size: .9rem; font-family: var(--font-body); width: 170px;
+}
+.scoreboard-namefield input:focus, .gameover-name-row input:focus {
+  outline: 2px solid var(--blue); outline-offset: -1px;
+}
+.scoreboard-tabs { align-self: flex-start; }
+.scoreboard-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.scoreboard-table th {
+  text-align: left; padding: 6px 10px; background: var(--bg); color: var(--muted);
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+}
+.scoreboard-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.scoreboard-table td.rank { font-family: var(--font-display); font-weight: 700; width: 36px; }
+.scoreboard-table td.score { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.scoreboard-table td.date { color: var(--muted); font-size: .8rem; text-align: right; }
+.scoreboard-table tbody tr:first-child td { background: #FFF8E1; }
+.scoreboard-empty { color: var(--muted); font-size: .92rem; padding: 18px 4px; }
+.gameover-highscore {
+  border: 1.5px dashed var(--orange); border-radius: var(--radius);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px;
+}
+.gameover-rank { font-weight: 700; color: var(--orange); }
+.gameover-name-row { display: flex; gap: 8px; }
+.gameover-name-row input { flex: 1; }
+
 /* ---- Reduzierte Bewegung ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
