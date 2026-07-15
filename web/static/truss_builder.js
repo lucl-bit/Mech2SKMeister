@@ -777,66 +777,39 @@ class TrussBuilder {
     ctx.fillText('y', x - 5, y + 90);
   }
 
-  // Mittlere Richtung der angeschlossenen Stäbe, vom Knoten weg zeigend.
-  // Roh (für Label-Platzierung) — null, wenn keine Stäbe anliegen.
+  // Mittlere Richtung "vom Stabwerk weg" (für Label-/Symbol-Platzierung).
   _awayVec(nodeId) {
     const n = this._nodeById(nodeId);
     if (!n) return null;
-    let sx = 0, sy = 0;
+    return DrawUtils.awayVec(n.x, n.y, this._neighborsOf(nodeId));
+  }
+
+  // Nachbarknoten-Positionen (für DrawUtils-Orientierungslogik).
+  _neighborsOf(nodeId) {
+    const out = [];
     for (const m of this.members) {
       let other = null;
       if (m.start_id === nodeId) other = this._nodeById(m.end_id);
       else if (m.end_id === nodeId) other = this._nodeById(m.start_id);
-      if (!other) continue;
-      const dx = other.x - n.x, dy = other.y - n.y, len = Math.hypot(dx, dy);
-      if (len > 1e-9) { sx += dx / len; sy += dy / len; }
+      if (other) out.push([other.x, other.y]);
     }
-    const len = Math.hypot(sx, sy);
-    if (len < 1e-6) return null;
-    return [-sx / len, -sy / len];
+    return out;
   }
 
-  // Wie _awayVec, aber auf 90°-Schritte gerastert; Default: nach unten.
-  _awayDir(nodeId) {
-    const v = this._awayVec(nodeId);
-    if (!v) return [0, 1];
-    const [ax, ay] = v;
-    if (Math.abs(ax) >= Math.abs(ay)) return [ax >= 0 ? 1 : -1, 0];
-    return [0, ay >= 0 ? 1 : -1];
-  }
-
-  // Lager-Symbole richten sich automatisch nach der Struktur aus: das Symbol
-  // zeigt vom Stabwerk weg (in 90°-Schritten). Kanonische Zeichnung: Symbol
-  // unterhalb des Knotens (away = +y) bzw. Wand links (fixed, away = −x).
+  // Lagersymbole physikalisch korrekt (Logik in DrawUtils):
+  // pin/roller nur Boden/Decke, Einspannung rechtwinklig zum Stab.
   _drawSupport(x, y, type, nodeId) {
     const ctx = this.ctx;
-    const [ax, ay] = this._awayDir(nodeId);
-    ctx.save();
-    ctx.translate(x, y);
+    const nb = this._neighborsOf(nodeId);
+    const opts = { stroke: TB.blue, fill: '#E8F0FF', scale: 1.1 };
     if (type === 'fixed') {
-      ctx.rotate(Math.atan2(-ay, -ax));
-      ctx.strokeStyle = TB.blue; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(-20, -44); ctx.lineTo(-20, 44); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(12, 0); ctx.stroke();
-      ctx.lineWidth = 2;
-      for (let off = -42; off <= 48; off += 12) {
-        ctx.beginPath(); ctx.moveTo(-38, off + 10); ctx.lineTo(-20, off); ctx.stroke();
-      }
-      ctx.restore();
+      DrawUtils.drawFixed(ctx, x, y, DrawUtils.fixedAngle(x, y, nb),
+        { stroke: TB.blue, lineWidth: 5, scale: 1.15 });
       return;
     }
-    ctx.rotate(Math.atan2(-ax, ay));
-    ctx.strokeStyle = TB.blue; ctx.fillStyle = '#E8F0FF'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(-17, 40); ctx.lineTo(17, 40);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    if (type === 'roller') {
-      ctx.beginPath(); ctx.arc(-9, 47, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(9, 47, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-24, 55); ctx.lineTo(24, 55); ctx.stroke();
-    } else {
-      ctx.beginPath(); ctx.moveTo(-23, 43); ctx.lineTo(23, 43); ctx.stroke();
-    }
-    ctx.restore();
+    const side = DrawUtils.supportSide(x, y, nb);
+    if (type === 'roller') DrawUtils.drawRoller(ctx, x, y, side, opts);
+    else DrawUtils.drawPin(ctx, x, y, side, opts);
   }
 
   _drawFreeEnd(x, y, nodeId) {

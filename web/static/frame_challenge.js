@@ -538,6 +538,18 @@ class FrameChallenge {
     }
   }
 
+  // Nachbarknoten-Pixelpositionen für Orientierungslogik (DrawUtils).
+  _neighborsOf(id) {
+    const out = [];
+    for (const bar of this.fixture.bars || []) {
+      let other = null;
+      if (bar.from === id) other = bar.to;
+      else if (bar.to === id) other = bar.from;
+      if (other && this.pixelNodes[other]) out.push(this.pixelNodes[other]);
+    }
+    return out;
+  }
+
   _drawJoints() {
     const ctx = this.ctx;
     const welds = new Set(this.fixture.welds || []);
@@ -553,68 +565,30 @@ class FrameChallenge {
           ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         }
       }
-      // Position label so it doesn't overlap supports below
-      const lo = supported.has(id) ? -18 : -16;
+      // Label auf der stabfreien Seite, damit kein Stab es überdeckt
+      const [ox, oy] = DrawUtils.labelOffset(px, py, this._neighborsOf(id), supported.has(id), 18);
       ctx.fillStyle = FC.text; ctx.font = 'bold 12px Helvetica'; ctx.textAlign = 'center';
-      ctx.fillText(id, px, py + lo); ctx.textAlign = 'left';
+      ctx.fillText(id, px + ox, py + oy); ctx.textAlign = 'left';
     }
   }
 
+  // Lagersymbole physikalisch korrekt (Logik in DrawUtils):
+  // pin/roller nur Boden/Decke, Einspannung rechtwinklig zum Stab.
   _drawSupports() {
+    const ctx = this.ctx;
     for (const [id, type] of Object.entries(this.fixture.supports || {})) {
       const [x, y] = this.pixelNodes[id];
-      if (type === 'fixed') this._drawFixedSupport(x, y, this._fixedSupportMirrored(id, x));
-      else if (type === 'pin') this._drawPin(x, y);
-      else if (type === 'roller') this._drawRoller(x, y);
+      const nb = this._neighborsOf(id);
+      if (type === 'fixed') {
+        DrawUtils.drawFixed(ctx, x, y, DrawUtils.fixedAngle(x, y, nb),
+          { stroke: FC.beam, lineWidth: 4, scale: 0.95 });
+      } else {
+        const side = DrawUtils.supportSide(x, y, nb);
+        const opts = { stroke: FC.beam, fill: '#F0F4FA', scale: 0.9 };
+        if (type === 'roller') DrawUtils.drawRoller(ctx, x, y, side, opts);
+        else DrawUtils.drawPin(ctx, x, y, side, opts);
+      }
     }
-  }
-
-  // Mirror the fixed-support symbol (wall on the right) when the attached bar
-  // runs predominantly to the left, so the bar doesn't disappear into the wall.
-  _fixedSupportMirrored(id, x) {
-    for (const bar of this.fixture.bars || []) {
-      let other = null;
-      if (bar.from === id) other = bar.to;
-      else if (bar.to === id) other = bar.from;
-      if (!other) continue;
-      const [ox, oy] = this.pixelNodes[other];
-      const dx = ox - x, dy = oy - this.pixelNodes[id][1];
-      if (dx < 0 && Math.abs(dx) > Math.abs(dy)) return true;
-    }
-    return false;
-  }
-
-  _drawFixedSupport(x, y, mirror = false) {
-    const ctx = this.ctx;
-    const s = mirror ? -1 : 1;
-    const wx = x - 18 * s;
-    ctx.strokeStyle = FC.beam; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(wx, y - 36); ctx.lineTo(wx, y + 36); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(x + 4 * s, y); ctx.stroke();
-    ctx.lineWidth = 1.5;
-    for (let off = -34; off <= 38; off += 10) {
-      ctx.beginPath(); ctx.moveTo(wx - 14 * s, y + off + 8); ctx.lineTo(wx, y + off); ctx.stroke();
-    }
-  }
-
-  _drawPin(x, y) {
-    const ctx = this.ctx;
-    ctx.strokeStyle = FC.beam; ctx.fillStyle = '#F0F4FA'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, y + 6); ctx.lineTo(x - 13, y + 28); ctx.lineTo(x + 13, y + 28);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - 20, y + 31); ctx.lineTo(x + 20, y + 31); ctx.stroke();
-    for (let i = -16; i <= 16; i += 6) {
-      ctx.beginPath(); ctx.moveTo(x + i, y + 31); ctx.lineTo(x + i - 4, y + 38); ctx.stroke();
-    }
-  }
-
-  _drawRoller(x, y) {
-    this._drawPin(x, y);
-    const ctx = this.ctx;
-    ctx.strokeStyle = FC.beam; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x - 7, y + 35, 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x + 7, y + 35, 3, 0, Math.PI * 2); ctx.stroke();
   }
 
   _drawLoads() {
