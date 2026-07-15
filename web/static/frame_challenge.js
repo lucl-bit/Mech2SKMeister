@@ -166,7 +166,10 @@ class FrameChallenge {
     this.results = null;
     this.showSolution = false;
     this._computedSolution = null;
-    this._updateStatus(`Aufgabe ${this.challengeNumber}: Zeichne den ${this.kind}-Verlauf. Ziehe die Endpunkte ◯ senkrecht zur Stabachse.`);
+    const paraHint = (this.fixture.parabolicBars?.[this.kind] || []).length
+      ? ` Stäbe mit Streckenlast haben 3 Handles (Anfang/Mitte/Ende) — q bestimmt die Krümmung der Parabel.`
+      : '';
+    this._updateStatus(`Aufgabe ${this.challengeNumber}: Zeichne den ${this.kind}-Verlauf. Ziehe die Endpunkte ◯ senkrecht zur Stabachse.${paraHint}`);
     this.draw();
     await this._computeSolution();
     this.draw();
@@ -333,7 +336,18 @@ class FrameChallenge {
     return { ...raw, M };
   }
 
+  // Erwartete Krümmungsrichtung der M-Parabel im Wertraum (Levels):
+  // M_kurs'' = +q  ⇒  sign(S+E−2M) muss sign(q) entsprechen.
+  _expectedCurvature(barId) {
+    if (this.kind !== 'M') return 0;
+    const dl = (this.fixture.loads || []).find(l => l.kind === 'distributed' && l.bar === barId);
+    if (!dl) return 0;
+    const q = Number(dl.q) || 0;
+    return q > 0 ? 1 : q < 0 ? -1 : 0;
+  }
+
   checkAll() {
+    this._curvatureWrong = null;
     const fullSol = this._solutionsOf();
     const sol = fullSol[this.kind];
     const solMid = fullSol[this.kind + '_mid'];  // e.g. M_mid, Q_mid
@@ -345,10 +359,16 @@ class FrameChallenge {
       const isPara = paraForKind.includes(bar.id) && solMid?.[bar.id];
       let ok;
       if (isPara) {
-        // For parabolic bars: only check the midpoint sign (endpoints are trivially 0)
-        const midSol = solMid[bar.id];
-        const midUser = a.mid > 0 ? '1' : a.mid < 0 ? '-1' : '0';
-        ok = midUser === midSol;
+        // Parabel-Stäbe: Vorzeichen-Tripel (Start, Mitte, Ende) plus
+        // Krümmungsrichtung (durch q vorgegeben) prüfen.
+        const sgnOf = v => (v > 0 ? '1' : v < 0 ? '-1' : '0');
+        const [solVs, solVe] = sol[bar.id].split(',');
+        const tripleOk = sgnOf(a.start) === solVs && sgnOf(a.mid) === solMid[bar.id] && sgnOf(a.end) === solVe;
+        const userCurv = a.start + a.end - 2 * a.mid;
+        const expCurv = this._expectedCurvature(bar.id);
+        const curvOk = expCurv === 0 || userCurv === 0 || Math.sign(userCurv) === expCurv;
+        ok = tripleOk && curvOk;
+        if (tripleOk && !curvOk) this._curvatureWrong = bar.id;
       } else {
         const userShape = window.SHAPE_FROM_VALUES(a.start, a.end);
         const [solVs, solVe] = sol[bar.id].split(',').map(Number);
@@ -371,7 +391,10 @@ class FrameChallenge {
       const wrongList = this.fixture.bars
         .filter(b => !this.results[b.id])
         .map(b => b.id).join(', ');
-      this._updateStatus(`${correct}/${total} richtig. Falsche Stäbe: ${wrongList}. Grüne gestrichelte Linie = richtige Lösung. (${pts} Punkte)`);
+      const curvHint = this._curvatureWrong
+        ? ` Stab ${this._curvatureWrong}: Vorzeichen ok, aber die Parabel krümmt in die falsche Richtung (q bestimmt die Krümmung).`
+        : '';
+      this._updateStatus(`${correct}/${total} richtig. Falsche Stäbe: ${wrongList}.${curvHint} Grüne gestrichelte Linie = richtige Lösung. (${pts} Punkte)`);
     }
     document.getElementById('game-points').textContent =
       (this.points >= 0 ? '+' : '') + this.points + ' Punkte';
@@ -709,18 +732,21 @@ class FrameChallenge {
       const ctx = this.ctx;
 
       if (isPara) {
-        // Draw parabolic shape using quadratic bezier through start, midpoint (offset by mid), end
-        const midX = (s[0] + e[0]) / 2, midY = (s[1] + e[1]) / 2;
-        const cpX = midX + nx * a.mid * LEVEL_STEP, cpY = midY + ny * a.mid * LEVEL_STEP;
-        // Filled region
+        // Parabel exakt durch alle drei Handle-Punkte (Start, Mitte, Ende):
+        // Kontrollpunkt cp = 2·PM − (P0+P2)/2 lässt die Bezier durch PM laufen.
+        const p0x = s[0] + nx * a.start * LEVEL_STEP, p0y = s[1] + ny * a.start * LEVEL_STEP;
+        const p2x = e[0] + nx * a.end * LEVEL_STEP,   p2y = e[1] + ny * a.end * LEVEL_STEP;
+        const pmx = (s[0] + e[0]) / 2 + nx * a.mid * LEVEL_STEP;
+        const pmy = (s[1] + e[1]) / 2 + ny * a.mid * LEVEL_STEP;
+        const cpX = 2 * pmx - (p0x + p2x) / 2, cpY = 2 * pmy - (p0y + p2y) / 2;
         ctx.fillStyle = color + fillAlpha;
         ctx.beginPath();
-        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]);
-        ctx.quadraticCurveTo(cpX, cpY, s[0], s[1]);
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(p0x, p0y);
+        ctx.quadraticCurveTo(cpX, cpY, p2x, p2y);
+        ctx.lineTo(e[0], e[1]); ctx.closePath();
         ctx.fill();
-        // Parabolic outline
         ctx.strokeStyle = color; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(cpX, cpY, e[0], e[1]); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(p0x, p0y); ctx.quadraticCurveTo(cpX, cpY, p2x, p2y); ctx.stroke();
       } else {
         const sx = s[0] + nx * a.start * LEVEL_STEP, sy = s[1] + ny * a.start * LEVEL_STEP;
         const ex = e[0] + nx * a.end * LEVEL_STEP,   ey = e[1] + ny * a.end * LEVEL_STEP;
@@ -776,20 +802,26 @@ class FrameChallenge {
       const isPara = paraForKind.includes(bar.id) && solMid?.[bar.id];
 
       if (isPara) {
+        // Ghost-Parabel durch alle drei Lösungspunkte (Start, Mitte, Ende)
+        const [gvs, gve] = shape.split(',').map(Number);
         const vm = Number(solMid[bar.id]);  // -1, 0, or 1
-        const midX = (s[0] + e[0]) / 2, midY = (s[1] + e[1]) / 2;
-        const cpX = midX + nx * vm * GS, cpY = midY + ny * vm * GS;
+        const p0x = s[0] + nx * gvs * GS, p0y = s[1] + ny * gvs * GS;
+        const p2x = e[0] + nx * gve * GS, p2y = e[1] + ny * gve * GS;
+        const pmx = (s[0] + e[0]) / 2 + nx * vm * GS;
+        const pmy = (s[1] + e[1]) / 2 + ny * vm * GS;
+        const cpX = 2 * pmx - (p0x + p2x) / 2, cpY = 2 * pmy - (p0y + p2y) / 2;
         ctx.fillStyle = '#2E9D6233';
         ctx.beginPath();
-        ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]);
-        ctx.quadraticCurveTo(cpX, cpY, s[0], s[1]);
+        ctx.moveTo(s[0], s[1]); ctx.lineTo(p0x, p0y);
+        ctx.quadraticCurveTo(cpX, cpY, p2x, p2y);
+        ctx.lineTo(e[0], e[1]); ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = FC.green; ctx.lineWidth = 3; ctx.setLineDash([7, 4]);
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(cpX, cpY, e[0], e[1]); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(p0x, p0y); ctx.quadraticCurveTo(cpX, cpY, p2x, p2y); ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = FC.green;
-        ctx.beginPath(); ctx.arc(cpX, cpY, 6, 0, Math.PI * 2); ctx.fill();
-        tag(cpX, cpY, vm);
+        ctx.beginPath(); ctx.arc(pmx, pmy, 6, 0, Math.PI * 2); ctx.fill();
+        tag(p0x, p0y, gvs); tag(pmx, pmy, vm); tag(p2x, p2y, gve);
       } else {
         const [vs, ve] = shape.split(',').map(Number);
         const sx = s[0] + nx * vs * GS, sy = s[1] + ny * vs * GS;
