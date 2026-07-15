@@ -609,7 +609,7 @@ class TrussBuilder {
 
   async _solveTruss() {
     const body = {
-      joints: this.nodes.map(n => ({ joint_id: n.node_id, x: n.x, y: n.y })),
+      joints: this.nodes.map(n => ({ joint_id: n.node_id, x: n.x / this.SNAP, y: n.y / this.SNAP })),
       bars: this.members.map(m => ({ bar_id: m.bar_id, start_id: m.start_id, end_id: m.end_id })),
       loads: this._allLoads(),
       supports: Object.entries(this.supports).map(([id, t]) => ({ joint_id: Number(id), support_type: t })),
@@ -633,7 +633,9 @@ class TrussBuilder {
 
   async _solveFrame() {
     const body = {
-      joints:   this.nodes.map(n => ({ joint_id: n.node_id, x: n.x, y: n.y })),
+      // Grid-Einheiten statt Pixel: Momente skalieren mit der Länge,
+      // sonst hängen die M-Werte von der Bildschirmauflösung ab.
+      joints:   this.nodes.map(n => ({ joint_id: n.node_id, x: n.x / this.SNAP, y: n.y / this.SNAP })),
       bars:     this.members.map(m => ({ bar_id: m.bar_id, start_id: m.start_id, end_id: m.end_id })),
       loads:    this._allLoads(),
       supports: Object.entries(this.supports).map(([id, t]) => ({ joint_id: Number(id), support_type: t })),
