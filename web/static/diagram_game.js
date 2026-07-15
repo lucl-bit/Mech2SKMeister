@@ -247,10 +247,12 @@ class DiagramGame {
 
   _drawExplanationCanvas() {
     const cvs = document.getElementById('explanation-canvas');
+    cvs.style.height = '392px';
+    cvs.style.maxHeight = '55vh';
     const dpr = window.devicePixelRatio || 1;
     const rect = cvs.getBoundingClientRect();
     const w = Math.max(rect.width || 640, 320);
-    const h = Math.max(rect.height || 220, 160);
+    const h = Math.max(rect.height || 392, 160);
     cvs.width = Math.round(w * dpr);
     cvs.height = Math.round(h * dpr);
     const ctx = cvs.getContext('2d');
@@ -331,6 +333,95 @@ class DiagramGame {
       ctx.beginPath(); ctx.moveTo(left, center); ctx.lineTo(right, center); ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    // ===== Schnittufer-Grafik: warum hat das Vorzeichen dieses Vorzeichen? =====
+    const kind = ch.diagram_kind;
+    const xCut = this._cutX(beam, kind);
+    const v = this._cutValues(beam, xCut);
+    const val = kind === 'N' ? v.N : kind === 'Q' ? v.Q : v.M;
+    const cutY = 300;
+    ctx.fillStyle = color; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'left';
+    ctx.fillText(`Schnitt bei x = ${(+xCut.toFixed(2))} m — so wirkt ${kind} an den Schnittufern:`, start, cutY - 34);
+    DrawUtils.drawCutFaces(ctx, sx(xCut), cutY, Math.min(110, (end - start) / 3), kind, val, color);
+    // Begründungstext
+    ctx.fillStyle = C.text; ctx.font = '11px Helvetica';
+    const words = this._cutExplainText(kind, v).split(' ');
+    let line = '', ty = cutY + (kind === 'Q' ? 72 : 56);
+    for (const word of words) {
+      if (ctx.measureText(line + word).width > w - 2 * start) {
+        ctx.fillText(line, start, ty); ty += 14; line = '';
+      }
+      line += word + ' ';
+    }
+    ctx.fillText(line, start, ty);
+  }
+
+  // Schnittgrößen an der Stelle x, in uni-Konvention (N Zug+, Q links-oben+,
+  // M hogging+). Rechnung im y↑-Basismodell wie das Backend (force_y<0 = ↓),
+  // am Ende M geflippt (uni = hogging+ = −sagging).
+  _cutValues(beam, x) {
+    const loads = beam.point_loads || [];
+    const dists = beam.distributed_loads || [];
+    const isCant = (beam.supports || []).some(s => s.support_type === 'fixed');
+
+    let ay = 0, momA = 0, xa = 0;
+    if (isCant) {
+      const sumFy = loads.reduce((s, l) => s + l.force_y, 0)
+        + dists.reduce((s, q) => s + q.q * (q.x_end - q.x_start), 0);
+      ay = -sumFy;
+      momA = -(loads.reduce((s, l) => s + l.force_y * l.x, 0)
+        + dists.reduce((s, q) => s + q.q * (q.x_end - q.x_start) * (q.x_start + q.x_end) / 2, 0));
+    } else {
+      xa = beam.supports[0].x;
+      const xb = beam.supports[1].x, span = xb - xa;
+      let sumFy = 0, sumM = 0;
+      for (const l of loads) { sumFy += l.force_y; sumM += l.force_y * (l.x - xa); }
+      for (const q of dists) {
+        const R = q.q * (q.x_end - q.x_start);
+        sumFy += R; sumM += R * ((q.x_start + q.x_end) / 2 - xa);
+      }
+      const by = -sumM / span;
+      ay = -sumFy - by;
+    }
+
+    let Q = ay, M = momA + ay * (x - xa), N = 0;
+    for (const l of loads) {
+      if (l.x <= x) { Q += l.force_y; M += l.force_y * (x - l.x); }
+      else N += (l.force_x || 0); // N = Summe der Horizontalkräfte rechts vom Schnitt
+    }
+    for (const q of dists) {
+      if (q.x_start >= x) continue;
+      const end = Math.min(q.x_end, x);
+      const R = q.q * (end - q.x_start);
+      Q += R; M += R * (x - (q.x_start + end) / 2);
+    }
+    return { N, Q, M: -M, ay, isCant };
+  }
+
+  // Sinnvolle Schnittstelle für die Erklärgrafik: dort, wo die gefragte
+  // Größe nicht trivial null ist.
+  _cutX(beam, kind) {
+    const L = beam.length;
+    const load = (beam.point_loads || [])[0];
+    if (!load) return kind === 'Q' ? 0.25 * L : 0.5 * L; // UDL
+    if (kind === 'M') return load.x;
+    return load.x * 0.5; // Q/N: zwischen linkem Rand und Last
+  }
+
+  _cutExplainText(kind, v) {
+    const dir = v.ay > 0 ? 'nach oben' : 'nach unten';
+    if (kind === 'Q') {
+      const s = v.Q > 0 ? 'positiv' : v.Q < 0 ? 'negativ' : 'null';
+      return `Links vom Schnitt wirkt die Auflagerkraft (${Math.abs(v.ay).toFixed(1)} kN ${dir}). `
+        + `Q ist hier ${s}: am linken Schnittufer zählt "nach oben" positiv.`;
+    }
+    if (kind === 'M') {
+      const side = v.M > 0 ? 'oben (M positiv)' : v.M < 0 ? 'unten (M negativ)' : '—';
+      return v.M === 0 ? 'An dieser Stelle ist das Biegemoment null.'
+        : `Der Balken wird hier so gebogen, dass die Zugseite ${side.split(' ')[0]} liegt → M ${v.M > 0 ? '> 0' : '< 0'} (Konvention: M um die +z-Achse, z zeigt in die Ebene).`;
+    }
+    const s = v.N > 0 ? 'Zug (+)' : v.N < 0 ? 'Druck (−)' : 'null';
+    return `N am Schnitt = Summe der Horizontalkräfte auf einer Seite → hier ${s}.`;
   }
 
   _drawShapeOn(ctx, shape, left, right, top, bottom, center, loadAt, halfAt, color) {
