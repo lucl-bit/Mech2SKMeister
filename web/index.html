@@ -241,6 +241,22 @@
   </div>
 </div>
 
+<!-- ===== LÖSUNGSWEG OVERLAY (Statik-Assistent) ===== -->
+<div id="walkthrough-overlay" class="overlay" style="display:none;" onclick="if (event.target === this) this.style.display='none'">
+  <div class="overlay-panel">
+    <div class="overlay-header walk-head">
+      <h2 id="walk-title">Lösungsweg</h2>
+      <button class="cheatsheet-close" id="walk-close" type="button">✕</button>
+    </div>
+    <canvas id="walk-canvas" width="640" height="220"></canvas>
+    <p id="walk-text" class="explanation-text"></p>
+    <div class="overlay-actions">
+      <button class="btn-back" id="walk-prev" type="button">← Zurück</button>
+      <button class="btn-accent" id="walk-next" type="button">Weiter →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== SCOREBOARD OVERLAY ===== -->
 <div id="scoreboard-overlay" class="overlay" style="display:none;" onclick="if (event.target === this) Scoreboard.close()">
   <div class="overlay-panel">
@@ -390,6 +406,7 @@
 <script src="/static/app.js"></script>
 <script src="/static/diagram_game.js"></script>
 <script src="/static/frame_fixtures.js"></script>
+<script src="/static/tutor.js"></script>
 <script src="/static/frame_challenge.js"></script>
 <script src="/static/truss_builder.js"></script>
 <script src="/static/inertia_fixtures.js"></script>

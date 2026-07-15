@@ -48,6 +48,7 @@ class FrameChallenge {
   }
 
   destroy() {
+    if (this.tutor) { this.tutor.detach(); this.tutor = null; }
     // Session-Ende: Punktestand still in die Bestenliste übernehmen
     if (window.Scoreboard) Scoreboard.submitQuiet('fachwerk', this.points, { streak: this.streak });
     this.canvas.removeEventListener('pointerdown', this._onDown);
@@ -81,6 +82,10 @@ class FrameChallenge {
     this._setupActions();
     this._setupKindFilter();
     this._setupSourceFilter();
+    if (window.StatikTutor) {
+      this.tutor = new StatikTutor(this);
+      this.tutor.attach();
+    }
     this._resize();
     this.loadChallenge();
   }
@@ -322,6 +327,7 @@ class FrameChallenge {
       ? ` Stäbe mit Streckenlast haben 3 Handles (Anfang/Mitte/Ende) — q bestimmt die Krümmung der Parabel.`
       : '';
     this._updateStatus(`Aufgabe ${this.challengeNumber}: Zeichne den ${this.kind}-Verlauf. Ziehe die Endpunkte ◯ senkrecht zur Stabachse.${paraHint}`);
+    if (this.tutor) this.tutor.newTask();
     this.draw();
     await this._computeSolution();
     this.draw();
@@ -395,12 +401,13 @@ class FrameChallenge {
         result = await resp.json();
         if (!result.ok) return;
 
-        // Rohwerte fürs Schnitt-Tool aufbewahren (N konstant je Stab)
+        // Rohwerte fürs Schnitt-Tool/Tutor aufbewahren (N konstant je Stab)
         this._forces = {};
         for (const b of fix.bars) {
           const f = result.bar_forces[b.id] || 0;
           this._forces[b.id] = { N_start: f, N_end: f, Q_start: 0, Q_end: 0, M_start: 0, M_end: 0 };
         }
+        this._reactions = result.reactions || {};
 
         const allN = fix.bars.map(b => Math.abs(result.bar_forces[b.id] || 0));
         const thrN = 0.05 * Math.max(...allN, 1e-6);
@@ -424,10 +431,11 @@ class FrameChallenge {
         if (!result.ok) return;
 
         const bf = result.bar_forces;
-        // Rohwerte fürs Schnitt-Tool aufbewahren (M hier noch FEM-Konvention;
-        // Kurs-Umrechnung passiert bei der Anzeige: M_kurs = −M_fem)
+        // Rohwerte fürs Schnitt-Tool/Tutor aufbewahren (M hier noch FEM-
+        // Konvention; Kurs-Umrechnung bei der Anzeige: M_kurs = −M_fem)
         this._forces = {};
         for (const b of fix.bars) { if (bf[b.id]) this._forces[b.id] = { ...bf[b.id] }; }
+        this._reactions = result.reactions || {};
 
         const pick = (key) => fix.bars.flatMap(b => bf[b.id] ? [Math.abs(bf[b.id][key])] : []);
         const thr = (vals) => 0.05 * Math.max(...vals, 1e-6);
@@ -563,6 +571,7 @@ class FrameChallenge {
     document.getElementById('game-points').textContent =
       (this.points >= 0 ? '+' : '') + this.points + ' Punkte';
     document.getElementById('game-points').style.color = this.points >= 0 ? FC.blue : FC.red;
+    if (this.tutor) this.tutor.afterCheck(correct, total);
     this.draw();
   }
 
