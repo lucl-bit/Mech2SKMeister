@@ -1,11 +1,6 @@
 'use strict';
 
-const FC = {
-  paper: '#FBFDFF', text: '#172033', muted: '#617089', border: '#D8E0EA',
-  gridMinor: '#DDECF8', gridMajor: '#C7DFF0',
-  blue: '#2F6FED', green: '#2E9D62', purple: '#7C5CE0',
-  red: '#D9534F', orange: '#D98634', beam: '#263447', load: '#D9534F',
-};
+const FC = window.THEME; // zentrale Palette (theme.js)
 
 const LEVEL_STEP = 22;   // pixels per "level" of value
 const MAX_LEVEL = 2;     // values snap to {-2,-1,0,1,2}

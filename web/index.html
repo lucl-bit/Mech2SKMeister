@@ -10,13 +10,28 @@
 
 <!-- ===== MENU VIEW ===== -->
 <div id="menu-view" class="view">
-  <div class="menu-hero">
-    <h1>Mech2 Beanspruchungsmeister</h1>
-    <p class="hero-sub">Wähle deinen Modus.</p>
-  </div>
+  <header class="plankopf">
+    <div class="plankopf-title">
+      <h1>Mech2 Beanspruchungs&shy;meister</h1>
+      <div class="hatch"></div>
+    </div>
+    <div class="plankopf-cell">
+      <span class="k">Gegenstand</span>
+      <span class="v">Mechanik II</span>
+    </div>
+    <div class="plankopf-cell">
+      <span class="k">Konvention</span>
+      <span class="v">x→ y↓ z⊗</span>
+    </div>
+    <div class="plankopf-cell">
+      <span class="k">Blatt</span>
+      <span class="v">Moduswahl</span>
+    </div>
+  </header>
   <div class="menu-cards">
 
     <div class="card mode-card" onclick="App.showDiagramGame('basics')">
+      <span class="mode-letter">A</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
           <line x1="20" y1="40" x2="120" y2="40" stroke="#263447" stroke-width="5"/>
@@ -37,6 +52,7 @@
     </div>
 
     <div class="card mode-card" onclick="App.showDiagramGame('fachwerk')">
+      <span class="mode-letter">B</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
           <line x1="20" y1="70" x2="120" y2="70" stroke="#263447" stroke-width="3"/>
@@ -63,6 +79,7 @@
     </div>
 
     <div class="card mode-card" onclick="App.showDiagramGame('speedrun')">
+      <span class="mode-letter">C</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
           <rect x="60" y="8" width="20" height="6" rx="2" fill="#D98634"/>
@@ -84,6 +101,7 @@
     </div>
 
     <div class="card mode-card" onclick="App.showInertiaLab('mid')">
+      <span class="mode-letter">D</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
           <rect x="35" y="14" width="70" height="14" fill="#11A8B5" opacity="0.85"/>
@@ -102,6 +120,7 @@
     </div>
 
     <div class="card mode-card" onclick="App.showTrussBuilder()">
+      <span class="mode-letter">E</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
           <line x1="25" y1="68" x2="115" y2="68" stroke="#2E9D62" stroke-width="2.5" stroke-dasharray="5,3"/>
@@ -328,6 +347,7 @@
   </div>
 </div>
 
+<script src="/static/theme.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/diagram_game.js"></script>
 <script src="/static/frame_fixtures.js"></script>

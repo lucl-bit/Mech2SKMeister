@@ -1,11 +1,6 @@
 'use strict';
 
-const C = {
-  paper: '#FBFDFF', text: '#172033', muted: '#617089', border: '#D8E0EA',
-  gridMinor: '#DDECF8', gridMajor: '#C7DFF0',
-  blue: '#2F6FED', green: '#2E9D62', purple: '#7C5CE0',
-  red: '#D9534F', orange: '#D98634', beam: '#263447', load: '#D9534F',
-};
+const C = window.THEME; // zentrale Palette (theme.js)
 
 const MODE_CONFIG = {
   basics:    { title: 'The Basics',     range: [1, 10],   timer: null, color: '#2F6FED' },

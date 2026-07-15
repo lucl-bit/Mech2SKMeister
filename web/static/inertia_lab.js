@@ -11,8 +11,8 @@
 (function () {
 
 const COLORS = {
-  paper: '#FBFDFF', axis: '#172033', dim: '#617089',
-  partFills: ['#2F6FED', '#7C5CE0', '#2E9D62', '#D98634', '#11A8B5', '#D9534F'],
+  paper: window.THEME.paper, axis: window.THEME.text, dim: window.THEME.muted,
+  partFills: window.THEME.partFills,
 };
 
 const TOL = 1e-3; // numerische Toleranz pro Zelle (Werte in Einheiten von a)
