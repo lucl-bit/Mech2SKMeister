@@ -18,6 +18,7 @@ from schnittkraft_trainer.game.diagram_challenges import (
     TrussVisual,
     generate_game_challenge,
 )
+from schnittkraft_trainer.game.truss_generator import generate_truss_fixture
 from schnittkraft_trainer.mechanics.truss_solver import (
     JointLoad,
     JointSupport,
@@ -68,6 +69,17 @@ def get_challenge():
     convention = load_convention(conv_path)
     challenge = generate_game_challenge(convention, challenge_number, seed=seed)
     return jsonify(_challenge_to_dict(challenge))
+
+
+@app.route("/api/generate-truss", methods=["POST"])
+def generate_truss_route():
+    data = request.get_json(silent=True) or {}
+    seed = data.get("seed")
+    try:
+        fixture = generate_truss_fixture(int(seed) if seed is not None else None)
+        return jsonify({"ok": True, "fixture": fixture})
+    except (RuntimeError, ValueError) as exc:
+        return jsonify({"ok": False, "error": str(exc)})
 
 
 @app.route("/api/solve-truss", methods=["POST"])

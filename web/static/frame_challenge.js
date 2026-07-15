@@ -45,10 +45,12 @@ class FrameChallenge {
     this.canvas.removeEventListener('pointerup', this._onUp);
     this.canvas.removeEventListener('pointercancel', this._onUp);
     window.removeEventListener('resize', this._onResize);
-    const bar = document.getElementById('game-kind-filter');
-    if (bar) {
-      bar.style.display = 'none';
-      bar.querySelectorAll('button').forEach(b => { b.onclick = null; });
+    for (const barId of ['game-kind-filter', 'game-source-filter']) {
+      const bar = document.getElementById(barId);
+      if (bar) {
+        bar.style.display = 'none';
+        bar.querySelectorAll('button').forEach(b => { b.onclick = null; });
+      }
     }
     // Restore bottombar so DiagramGame's original "Neue Aufgabe" button works
     // again. Without this, FC's stale buttons stay in the DOM and their onclick
@@ -64,10 +66,26 @@ class FrameChallenge {
     document.getElementById('game-mode-title').textContent = 'Fachwerk Profi — Zeichnen';
     document.getElementById('game-timer').style.display = 'none';
     this.kindFilter = 'mix';
+    this.sourceFilter = 'mix';
     this._setupActions();
     this._setupKindFilter();
+    this._setupSourceFilter();
     this._resize();
     this.loadChallenge();
+  }
+
+  _setupSourceFilter() {
+    const bar = document.getElementById('game-source-filter');
+    if (!bar) return;
+    bar.style.display = '';
+    bar.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.s === this.sourceFilter);
+      b.onclick = () => {
+        this.sourceFilter = b.dataset.s;
+        bar.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+        this.loadChallenge();
+      };
+    });
   }
 
   _setupKindFilter() {
@@ -100,12 +118,35 @@ class FrameChallenge {
   }
 
   async loadChallenge() {
-    const fixes = window.FRAME_FIXTURES;
-    if (!this._queue || this._queue.length === 0) {
-      this._queue = [...fixes].sort(() => Math.random() - 0.5);
+    // Generierte Fachwerke sind ideale Fachwerke (nur N sinnvoll) — bei
+    // Q-/M-Filter bleiben wir bei den Prüfungsaufgaben.
+    const genAllowed = this.kindFilter === 'mix' || this.kindFilter === 'N';
+    const useGenerator = genAllowed && (
+      this.sourceFilter === 'random' ||
+      (this.sourceFilter === 'mix' && Math.random() < 0.4)
+    );
+    this.fixture = null;
+    if (useGenerator) {
+      try {
+        const resp = await fetch('/api/generate-truss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await resp.json();
+        if (data.ok) this.fixture = data.fixture;
+      } catch (e) { /* Fallback auf Prüfungsaufgaben */ }
     }
-    this.fixture = this._queue.pop();
-    if (this.kindFilter && this.kindFilter !== 'mix') {
+    if (!this.fixture) {
+      const fixes = window.FRAME_FIXTURES;
+      if (!this._queue || this._queue.length === 0) {
+        this._queue = [...fixes].sort(() => Math.random() - 0.5);
+      }
+      this.fixture = this._queue.pop();
+    }
+    if (this.fixture.generated) {
+      this.kind = 'N';
+    } else if (this.kindFilter && this.kindFilter !== 'mix') {
       this.kind = this.kindFilter;
     } else {
       const kinds = ['N', 'Q', 'M'];
