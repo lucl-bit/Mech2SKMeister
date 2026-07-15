@@ -482,12 +482,14 @@ class TrussBuilder {
     this.redraw();
   }
 
-  _isFrame() { return this.welds.size > 0; }
+  // Rahmen-Pfad, sobald geschweißte Knoten oder eine Einspannung existieren —
+  // beides kann der reine Fachwerk-Solver (nur Normalkräfte) nicht abbilden.
+  _isFrame() {
+    return this.welds.size > 0 || Object.values(this.supports).includes('fixed');
+  }
 
   validate() {
     const j = this.nodes.length, m = this.members.length;
-    if (this._cantileverCase()) { this._setStatus('Kragträger erkannt: Berechnen ist möglich.'); return; }
-
     if (this._isFrame()) {
       // Frame formula: 3m + r = 3j + g
       // r: fixed=3, pin=2, roller=1
@@ -524,9 +526,6 @@ class TrussBuilder {
   }
 
   async solve() {
-    const cantilever = this._cantileverCase();
-    if (cantilever) { this._solveCantilever(cantilever); return; }
-
     if (this._isFrame() || Object.keys(this.distributedLoads).length > 0) {
       await this._solveFrame();
     } else {
@@ -591,51 +590,18 @@ class TrussBuilder {
     for (const [k, v] of Object.entries(result.bar_forces)) {
       const bid = Number(k);
       const bar = this.members.find(m => m.bar_id === bid);
-      this.beamResults[bid] = { ...v, start_id: bar.start_id, end_id: bar.end_id };
+      // FEM liefert M in Element-Konvention (M+ = Zug auf +n-Seite, "sagging").
+      // Kurs-Konvention (ETH Mech II, y↓/z⊗): M_z um die z-Achse → Vorzeichen flippen.
+      // N (Zug+) und Q sind in beiden Konventionen identisch.
+      this.beamResults[bid] = {
+        ...v,
+        M_start: -v.M_start,
+        M_end:   -v.M_end,
+        start_id: bar.start_id, end_id: bar.end_id,
+      };
     }
     this.reactions = result.reactions;
     this._setStatus('Rahmen berechnet. Wähle N, Q oder M.');
-    this.redraw();
-  }
-
-  _cantileverCase() {
-    if (this.members.length !== 1) return null;
-    const mem = this.members[0];
-    const start = this._nodeById(mem.start_id), end = this._nodeById(mem.end_id);
-    const sFixed = this.supports[start.node_id] === 'fixed', eFree = this.freeEnds.has(end.node_id);
-    const eFixed = this.supports[end.node_id] === 'fixed', sFree = this.freeEnds.has(start.node_id);
-    let fixed, free;
-    if (sFixed && eFree) { fixed = start; free = end; }
-    else if (eFixed && sFree) { fixed = end; free = start; }
-    else return null;
-    if (!this.loads[free.node_id] || Object.keys(this.loads).length !== 1) return null;
-    return { mem, fixed, free, load: this.loads[free.node_id] };
-  }
-
-  _solveCantilever({ mem, fixed, free, load }) {
-    const dx = free.x - fixed.x, dy = free.y - fixed.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-9) { this._setStatus('Nicht lösbar: Länge 0.'); return; }
-    const ux = dx / len, uy = dy / len;
-    const nx = -uy, ny = ux;
-    const normal = load.fx * ux + load.fy * uy;
-    const shear  = load.fx * nx + load.fy * ny;
-    // Auflagermoment (Reaktion gegen die Last) -- positives Vorzeichen entspricht
-    // CCW-Reaktion am Einspannknoten.
-    const reactionMz = shear * len / this.SNAP;
-    // Inneres Biegemoment M an der Einspannung hat das umgekehrte Vorzeichen
-    // (Konvention: M+ = Zug auf der "unteren" Faser bzw. +n-Seite des Stabes).
-    // Beim Kragträger mit Last am freien Ende ist die Zugfaser auf der Lastseite
-    // gegenüber -> M ist negativ.
-    const moment = -reactionMz;
-    this.memberForces = {};
-    this.beamResults = { [mem.bar_id]: { fixed_id: fixed.node_id, free_id: free.node_id, normal, shear, moment } };
-    this.reactions = {
-      [`rx:${fixed.node_id}`]: -load.fx,
-      [`ry:${fixed.node_id}`]: -load.fy,
-      [`mz:${fixed.node_id}`]: reactionMz,
-    };
-    this._setStatus('Kragträger berechnet: N/Q/M sind jetzt verfügbar.');
     this.redraw();
   }
 
@@ -873,7 +839,8 @@ class TrussBuilder {
     const dx = e.x - s.x, dy = e.y - s.y;
     const len = Math.hypot(dx, dy);
     if (len < 1e-9) return;
-    const nx = -dy / len, ny = dx / len;
+    // Positive Werte auf der Ordinaten-Seite der Prüfungsdiagramme (−lokal-y)
+    const nx = dy / len, ny = -dx / len;
     const sign = force > 0 ? 1 : -1;
     const off = sign * Math.min(62, 18 + Math.abs(force) * 3);
     const sx = s.x + nx * off, sy = s.y + ny * off;
@@ -892,17 +859,9 @@ class TrussBuilder {
   }
 
   _drawBeamResponse(s, e, br) {
-    if ('N_start' in br) {
-      // General frame result with start/end values
-      if (this.mode === 'N') this._drawLinearResponse(s, e, br.N_start, br.N_end, 'N');
-      else if (this.mode === 'Q') this._drawLinearResponse(s, e, br.Q_start, br.Q_end, 'Q');
-      else this._drawLinearResponse(s, e, br.M_start, br.M_end, 'M');
-    } else {
-      // Cantilever fallback
-      if (this.mode === 'N') this._drawConstantBeamResponse(s, e, br.normal, 'N');
-      else if (this.mode === 'Q') this._drawConstantBeamResponse(s, e, br.shear, 'Q');
-      else this._drawMomentBeamResponse(s, e, br.moment);
-    }
+    if (this.mode === 'N') this._drawLinearResponse(s, e, br.N_start, br.N_end, 'N');
+    else if (this.mode === 'Q') this._drawLinearResponse(s, e, br.Q_start, br.Q_end, 'Q');
+    else this._drawLinearResponse(s, e, br.M_start, br.M_end, 'M');
   }
 
   _drawLinearResponse(s, e, v_start, v_end, mode) {
@@ -915,7 +874,8 @@ class TrussBuilder {
     const dx = e.x - s.x, dy = e.y - s.y;
     const len = Math.hypot(dx, dy);
     if (len < 1e-9) return;
-    const nx = -dy / len, ny = dx / len;
+    // Positive Werte auf der Ordinaten-Seite der Prüfungsdiagramme (−lokal-y)
+    const nx = dy / len, ny = -dx / len;
 
     const maxAbs = Math.max(Math.abs(v_start), Math.abs(v_end));
     const scale  = Math.min(68, 20 + maxAbs * 2.5) / maxAbs;
@@ -939,47 +899,6 @@ class TrussBuilder {
     if (Math.abs(v_end - v_start) > 0.05) {
       this._valueLabel(ex, ey, `${mode}=${v_end >= 0 ? '+' : ''}${v_end.toFixed(2)}`, color);
     }
-  }
-
-  _drawConstantBeamResponse(s, e, value, mode) {
-    if (Math.abs(value) < 1e-6) { this._drawZeroResponse(s, e, mode); return; }
-    const colors = { N: TB.green, Q: TB.purple };
-    let color = colors[mode], fill = mode === 'N' ? '#E4F4EA' : '#F0EAFE';
-    if (mode === 'N' && value < 0) { fill = '#FFF0DF'; color = TB.orange; }
-    const [sx, sy, ex, ey] = this._offsetLine(s, e, value);
-    const ctx = this.ctx;
-    ctx.fillStyle = fill; ctx.strokeStyle = color; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-    this._responseLabel((s.x + e.x + sx + ex) / 4, (s.y + e.y + sy + ey) / 4, value > 0 ? '+' : '-', color);
-    this._valueLabel((sx + ex) / 2, (sy + ey) / 2, `${mode}=${value >= 0 ? '+' : ''}${value.toFixed(2)}`, color);
-  }
-
-  _drawMomentBeamResponse(s, e, value) {
-    if (Math.abs(value) < 1e-6) { this._drawZeroResponse(s, e, 'M'); return; }
-    const [sx, sy] = this._offsetLine(s, e, value);
-    const ctx = this.ctx;
-    ctx.fillStyle = '#FDECEC'; ctx.strokeStyle = TB.red; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.lineTo(sx, sy);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(e.x, e.y); ctx.stroke();
-    this._responseLabel((s.x + e.x + sx) / 3, (s.y + e.y + sy) / 3, value > 0 ? '+' : '-', TB.red);
-    this._valueLabel(sx, sy, `M=${value >= 0 ? '+' : ''}${value.toFixed(2)}`, TB.red);
-  }
-
-  _offsetLine(s, e, value) {
-    const dx = e.x - s.x, dy = e.y - s.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-9) return [s.x, s.y, e.x, e.y];
-    const nx = -dy / len, ny = dx / len;
-    const sign = value > 0 ? 1 : -1;
-    const off = sign * Math.min(72, 22 + Math.abs(value) * 2.6);
-    return [s.x + nx * off, s.y + ny * off, e.x + nx * off, e.y + ny * off];
   }
 
   _drawZeroResponse(s, e, mode) {

@@ -206,7 +206,8 @@ class FrameChallenge {
           if (!f) continue;
           sol.N[b.id] = `${sgn(f.N_start, thrN)},${sgn(f.N_end, thrN)}`;
           sol.Q[b.id] = `${sgn(f.Q_start, thrQ)},${sgn(f.Q_end, thrQ)}`;
-          sol.M[b.id] = `${sgn(f.M_start, thrM)},${sgn(f.M_end, thrM)}`;
+          // FEM-M (sagging+) → Kurs-Konvention M_z (ETH Mech II, y↓/z⊗): Vorzeichen flippen
+          sol.M[b.id] = `${sgn(-f.M_start, thrM)},${sgn(-f.M_end, thrM)}`;
         }
 
         // Compute midpoint M for parabolic bars: M(L/2) = M_start + Q_start*(L/2) - q*(L/2)²/2
@@ -220,7 +221,8 @@ class FrameChallenge {
             const q = dl ? Number(dl.q) : 0;
             const n1 = fix.nodes[b.from], n2 = fix.nodes[b.to];
             const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-            const M_mid = f.M_start + f.Q_start * (L / 2) - q * (L / 2) ** 2 / 2;
+            // FEM-intern berechnen, dann in Kurs-Konvention (M_z = −M_fem) umrechnen
+            const M_mid = -(f.M_start + f.Q_start * (L / 2) - q * (L / 2) ** 2 / 2);
             const thrMid = 0.05 * Math.max(Math.abs(M_mid), 1e-6);
             sol.M_mid[b.id] = Math.abs(M_mid) < thrMid ? '0' : M_mid > 0 ? '1' : '-1';
           }
@@ -249,8 +251,22 @@ class FrameChallenge {
     this.draw();
   }
 
+  // Lösungs-Signaturen in Kurs-Konvention. Primär vom Solver (_computeSolution,
+  // dort bereits konvertiert); Fallback sind die handgeschriebenen Fixture-
+  // Lösungen, die in der alten Element-Konvention (M sagging+) notiert sind
+  // und deshalb beim M-Verlauf geflippt werden müssen.
+  _solutionsOf() {
+    if (this._computedSolution) return this._computedSolution;
+    const raw = this.fixture.solutions;
+    if (!raw) return null;
+    const flip = str => str.split(',').map(v => String(-Number(v) || 0)).join(',');
+    const M = {};
+    for (const [barId, str] of Object.entries(raw.M || {})) M[barId] = flip(str);
+    return { ...raw, M };
+  }
+
   checkAll() {
-    const fullSol = this._computedSolution || this.fixture.solutions;
+    const fullSol = this._solutionsOf();
     const sol = fullSol[this.kind];
     const solMid = fullSol[this.kind + '_mid'];  // e.g. M_mid, Q_mid
     const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
@@ -335,7 +351,9 @@ class FrameChallenge {
     const dx = e[0] - s[0], dy = e[1] - s[1];
     const len = Math.hypot(dx, dy);
     const ux = dx / len, uy = dy / len;
-    const nx = -uy, ny = ux;   // CCW 90° normal
+    // Positive Verlaufswerte liegen auf der −lokal-y-Seite des Stabes —
+    // das ist die Ordinatenrichtung der Prüfungsdiagramme (ETH Mech II, y↓).
+    const nx = uy, ny = -ux;
     return { s, e, ux, uy, nx, ny, len };
   }
 
@@ -695,7 +713,7 @@ class FrameChallenge {
   }
 
   _drawSolutionGhost() {
-    const fullSol = this._computedSolution || this.fixture.solutions;
+    const fullSol = this._solutionsOf();
     const sol = fullSol[this.kind];
     const solMid = fullSol[this.kind + '_mid'];
     const paraForKind = this.fixture.parabolicBars?.[this.kind] || [];
