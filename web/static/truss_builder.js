@@ -44,7 +44,7 @@ class TrussBuilder {
     this._buildToolbar();
     this._buildHistoryControls();
     this._resize();
-    this.redraw();
+    this.requestRedraw();
 
     this._onPress = this._onPress.bind(this);
     this._onMove = this._onMove.bind(this);
@@ -61,12 +61,22 @@ class TrussBuilder {
   }
 
   destroy() {
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
     this.canvas.removeEventListener('pointerdown', this._onPress);
     this.canvas.removeEventListener('pointermove', this._onMove);
     this.canvas.removeEventListener('pointerup', this._onRelease);
     this.canvas.removeEventListener('pointercancel', this._onRelease);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
+  }
+
+  // Redraw höchstens einmal pro Frame (rAF), statt synchron bei jedem Event.
+  requestRedraw() {
+    if (this._rafId) return;
+    this._rafId = requestAnimationFrame(() => {
+      this._rafId = null;
+      this.redraw();
+    });
   }
 
   _buildToolbar() {
@@ -101,6 +111,10 @@ class TrussBuilder {
 
   _buildHistoryControls() {
     const container = document.getElementById('tool-buttons');
+    // Idempotent: alte Undo/Redo-Zeile entfernen (sonst stapeln sich Zeilen
+    // bei jedem Tab-Wechsel, weil destroy() die Toolbar-DOM nicht abräumt).
+    const stale = container.parentNode.querySelector('.history-row');
+    if (stale) stale.remove();
     const wrap = document.createElement('div');
     wrap.className = 'history-row';
     wrap.innerHTML = `
@@ -162,7 +176,7 @@ class TrussBuilder {
     this._restore(this.undoStack.pop());
     this._setStatus('Rückgängig.');
     this._updateHistoryButtons();
-    this.redraw();
+    this.requestRedraw();
   }
   redo() {
     if (!this.redoStack.length) return;
@@ -170,7 +184,7 @@ class TrussBuilder {
     this._restore(this.redoStack.pop());
     this._setStatus('Wiederhergestellt.');
     this._updateHistoryButtons();
-    this.redraw();
+    this.requestRedraw();
   }
   _onKey(e) {
     const mod = e.metaKey || e.ctrlKey;
@@ -203,14 +217,14 @@ class TrussBuilder {
     document.getElementById('mode-' + m).classList.add('btn-mode-active');
     if (m === 'N') this._setStatus('N-Modus: Normalkraft. Positive N = Zug.');
     else this._setStatus(`${m}-Modus: Beanspruchungsverlauf anzeigen.`);
-    this.redraw();
+    this.requestRedraw();
   }
 
   _setStatus(msg) { document.getElementById('builder-status').textContent = msg; }
 
   _snap(v) { return Math.round(v / this.SNAP) * this.SNAP; }
 
-  _onResize() { this._resize(); this.redraw(); }
+  _onResize() { this._resize(); this.requestRedraw(); }
   _resize() {
     const dpr = window.devicePixelRatio || 1;
     const w = this.wrap.clientWidth, h = this.wrap.clientHeight;
@@ -220,6 +234,37 @@ class TrussBuilder {
     this.canvas.height = Math.round(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this._cssW = w; this._cssH = h;
+    this._rebuildStaticLayer(w, h, dpr);
+  }
+
+  // Grid + Koordinatensystem sind statisch: einmal pro Resize auf ein
+  // Offscreen-Canvas rendern und im redraw() nur noch blitten.
+  _rebuildStaticLayer(w, h, dpr) {
+    if (w <= 0 || h <= 0) { this._staticLayer = null; return; }
+    const layer = document.createElement('canvas');
+    layer.width = Math.round(w * dpr);
+    layer.height = Math.round(h * dpr);
+    const ctx = layer.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const minor = this.SNAP, major = minor * 4;
+    ctx.lineWidth = 1;
+    // Alle Linien einer Farbe in einem einzigen Path
+    for (const [style, isMajor] of [[TB.gridMinor, false], [TB.gridMajor, true]]) {
+      ctx.strokeStyle = style;
+      ctx.beginPath();
+      for (let x = 0; x <= w + minor; x += minor) {
+        if ((x % major === 0) !== isMajor) continue;
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      }
+      for (let y = 0; y <= h + minor; y += minor) {
+        if ((y % major === 0) !== isMajor) continue;
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+    }
+    this._drawCoordSystemOn(ctx, 44, h - 130);
+    this._staticLayer = layer;
   }
 
   _pos(e) {
@@ -246,7 +291,7 @@ class TrussBuilder {
     else if (this.tool === 'loadz')    { this._pushUndo(); this._toggleZLoad(mx, my); }
     else if (this.tool === 'distload') { this._pushUndo(); this._toggleDistLoad(mx, my); }
     else if (this.tool === 'delete')   { this._pushUndo(); this._deleteNearest(mx, my); }
-    if (this.tool !== 'load') this.redraw();
+    if (this.tool !== 'load') this.requestRedraw();
   }
 
   _onMove(e) {
@@ -262,19 +307,26 @@ class TrussBuilder {
       } else {
         this.canvas.style.cursor = this._editHitTest(mx, my) ? 'grab' : 'default';
       }
-      this.redraw(); return;
+      this.requestRedraw(); return;
     }
     this.hoverPos = [mx, my];
-    this.hoverNode = this._nearestNode(mx, my, 22);
+    const prevHover = this.hoverNode;
+    this.hoverNode = this._pickNode(mx, my);
     if (this.tool === 'load' && this.activeLoadNodeId !== null) {
       this.previewLoadEnd = [this._snap(mx), this._snap(my)];
     }
-    this.redraw();
+    // Nur neu zeichnen, wenn sich sichtbar etwas ändert: Hover-Wechsel oder
+    // eine aktive Vorschau (Knoten-Ghost, Stab-Linie, Last-Pfeil).
+    const hasPreview =
+      this.tool === 'node' ||
+      (this.tool === 'member' && this.activeMemberStart !== null) ||
+      (this.tool === 'load' && this.activeLoadNodeId !== null);
+    if (hasPreview || this.hoverNode !== prevHover) this.requestRedraw();
   }
 
   _onRelease(e) {
     if (this.editMode) {
-      if (this.editDragging) { this.editDragging = null; this.canvas.style.cursor = 'grab'; this.redraw(); }
+      if (this.editDragging) { this.editDragging = null; this.canvas.style.cursor = 'grab'; this.requestRedraw(); }
       return;
     }
     if (this.tool !== 'load' || this.activeLoadNodeId === null) return;
@@ -282,7 +334,7 @@ class TrussBuilder {
     this._finishLoad(mx, my);
     this.activeLoadNodeId = null;
     this.previewLoadEnd = null;
-    this.redraw();
+    this.requestRedraw();
   }
 
   _addNode(x, y) {
@@ -294,12 +346,12 @@ class TrussBuilder {
   }
 
   _handleMemberTool(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Für einen Stab zuerst einen Knoten anklicken.'); return; }
     if (this.activeMemberStart === null) {
       this.activeMemberStart = node.node_id;
       this._setStatus(`Startknoten ${node.node_id} gewählt. Zweiten Knoten anklicken.`);
-      this.redraw(); return;
+      this.requestRedraw(); return;
     }
     if (this.activeMemberStart === node.node_id) { this._setStatus('Start und Ende dürfen nicht derselbe Knoten sein.'); return; }
     const ids = new Set([this.activeMemberStart, node.node_id]);
@@ -317,7 +369,7 @@ class TrussBuilder {
   }
 
   _setSupport(mx, my, type) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Lager muss auf einen Knoten gesetzt werden.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     this.supports[node.node_id] = type;
     this.freeEnds.delete(node.node_id);
@@ -327,7 +379,7 @@ class TrussBuilder {
   }
 
   _toggleWeld(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Verschweissung muss auf einen Knoten gesetzt werden.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     if (this.welds.has(node.node_id)) {
       this.welds.delete(node.node_id);
@@ -340,7 +392,7 @@ class TrussBuilder {
   }
 
   _setFree(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Freies Ende muss auf einen vorhandenen Knoten gesetzt werden.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     delete this.supports[node.node_id];
     this.freeEnds.add(node.node_id);
@@ -349,7 +401,7 @@ class TrussBuilder {
   }
 
   _startLoad(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Last muss an einem vorhandenen Knoten starten.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     this.activeLoadNodeId = node.node_id;
     this.previewLoadEnd = [node.x, node.y + 48];
@@ -371,7 +423,7 @@ class TrussBuilder {
   }
 
   _toggleZLoad(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Z-Last muss an einem vorhandenen Knoten gesetzt werden.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     const id = node.node_id;
     const existing = this.loadsZ[id];
@@ -389,7 +441,7 @@ class TrussBuilder {
   }
 
   _deleteNearest(mx, my) {
-    const node = this._nearestNode(mx, my);
+    const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Kein Knoten in der Nähe.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     const id = node.node_id;
     this.nodes = this.nodes.filter(n => n.node_id !== id);
@@ -414,6 +466,15 @@ class TrussBuilder {
       if (d <= bestD) { best = n; bestD = d; }
     }
     return best;
+  }
+
+  // Einheitliche Knotenauswahl für alle Werkzeuge: großzügige Toleranz um die
+  // rohe Mausposition, sonst Fallback auf den gesnappten Rasterpunkt. Damit
+  // trifft ein Klick "in die Nähe" zuverlässig — und der Hover-Halo zeigt
+  // exakt den Knoten, den der Klick treffen würde.
+  _pickNode(mx, my) {
+    return this._nearestNode(mx, my, this.SNAP * 0.9)
+        || this._nearestNode(this._snap(mx), this._snap(my), 1);
   }
 
   _nodeById(id) { return this.nodes.find(n => n.node_id === id); }
@@ -454,7 +515,7 @@ class TrussBuilder {
     this.memberForces = {}; this.beamResults = {}; this.reactions = {};
     this.nextNodeId = 1; this.activeMemberStart = null;
     this.activeLoadNodeId = null; this.previewLoadEnd = null;
-    this._setStatus('Leere Zeichenfläche.'); this.redraw();
+    this._setStatus('Leere Zeichenfläche.'); this.requestRedraw();
   }
 
   loadExample() {
@@ -479,7 +540,7 @@ class TrussBuilder {
     this.nextNodeId = 4;
     this.memberForces = {}; this.beamResults = {}; this.reactions = {};
     this._setStatus('Beispiel geladen. Klicke Berechnen für Stabkräfte.');
-    this.redraw();
+    this.requestRedraw();
   }
 
   // Rahmen-Pfad, sobald geschweißte Knoten oder eine Einspannung existieren —
@@ -557,7 +618,7 @@ class TrussBuilder {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const result = await resp.json();
-    if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.redraw(); return; }
+    if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.requestRedraw(); return; }
 
     this.memberForces = {};
     for (const [k, v] of Object.entries(result.bar_forces)) this.memberForces[Number(k)] = v;
@@ -567,7 +628,7 @@ class TrussBuilder {
     const tension     = Object.values(this.memberForces).filter(v => v >  1e-6).length;
     const compression = Object.values(this.memberForces).filter(v => v < -1e-6).length;
     this._setStatus(`Berechnet: ${tension} Zugstäbe, ${compression} Druckstäbe. Wähle N, Q oder M.`);
-    this.redraw();
+    this.requestRedraw();
   }
 
   async _solveFrame() {
@@ -583,7 +644,7 @@ class TrussBuilder {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const result = await resp.json();
-    if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.redraw(); return; }
+    if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.requestRedraw(); return; }
 
     this.memberForces = {};
     this.beamResults  = {};
@@ -602,7 +663,7 @@ class TrussBuilder {
     }
     this.reactions = result.reactions;
     this._setStatus('Rahmen berechnet. Wähle N, Q oder M.');
-    this.redraw();
+    this.requestRedraw();
   }
 
   // ===== DRAWING =====
@@ -611,8 +672,7 @@ class TrussBuilder {
     const w = this._cssW || this.canvas.width, h = this._cssH || this.canvas.height;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, w, h);
-    this._drawGrid(w, h);
-    this._drawCoordSystem(44, h - 130);
+    if (this._staticLayer) ctx.drawImage(this._staticLayer, 0, 0, w, h);
 
     // Hover halo on nearest node
     if (this.hoverNode && this.tool !== 'node') {
@@ -629,8 +689,12 @@ class TrussBuilder {
     // Preview line for member tool
     if (this.tool === 'member' && this.activeMemberStart !== null && this.hoverPos) {
       const s = this._nodeById(this.activeMemberStart);
+      // Vorschau snappt auf den Knoten, der beim Klick getroffen würde
+      const target = (this.hoverNode && this.hoverNode.node_id !== this.activeMemberStart)
+        ? [this.hoverNode.x, this.hoverNode.y]
+        : this.hoverPos;
       ctx.strokeStyle = TB.blue; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(this.hoverPos[0], this.hoverPos[1]); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(target[0], target[1]); ctx.stroke();
       ctx.setLineDash([]);
     }
 
@@ -647,11 +711,11 @@ class TrussBuilder {
 
     for (const [id, type] of Object.entries(this.supports)) {
       const n = this._nodeById(Number(id));
-      if (n) this._drawSupport(n.x, n.y, type);
+      if (n) this._drawSupport(n.x, n.y, type, Number(id));
     }
     for (const id of this.freeEnds) {
       const n = this._nodeById(id);
-      if (n) this._drawFreeEnd(n.x, n.y);
+      if (n) this._drawFreeEnd(n.x, n.y, id);
     }
     for (const load of Object.values(this.loads)) {
       const n = this._nodeById(load.node_id);
@@ -659,7 +723,7 @@ class TrussBuilder {
     }
     for (const lz of Object.values(this.loadsZ)) {
       const n = this._nodeById(lz.node_id);
-      if (n) this._drawZLoad(n.x, n.y, lz.direction);
+      if (n) this._drawZLoad(n.x, n.y, lz.direction, lz.node_id);
     }
     for (const dl of Object.values(this.distributedLoads)) {
       const bar = this.members.find(m => m.bar_id === dl.bar_id);
@@ -688,66 +752,109 @@ class TrussBuilder {
         ctx.strokeStyle = TB.blue; ctx.fillStyle = fill; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(n.x, n.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       }
+      // Label auf der stabfreien Seite platzieren (Default: oben).
+      // Bei gelagerten Knoten sitzt dort das Lagersymbol → senkrecht ausweichen.
+      let away = this._awayVec(n.node_id) || [0, -1];
+      if (this.supports[n.node_id]) away = [-away[1], away[0]];
       ctx.fillStyle = TB.muted; ctx.font = 'bold 10px Helvetica'; ctx.textAlign = 'center';
-      ctx.fillText(String(n.node_id), n.x, n.y - 16); ctx.textAlign = 'left';
+      ctx.fillText(String(n.node_id), n.x + away[0] * 17, n.y + away[1] * 17 + 3);
+      ctx.textAlign = 'left';
     }
   }
 
-  _drawGrid(w, h) {
-    const ctx = this.ctx, minor = this.SNAP, major = minor * 4;
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= w + minor; x += minor) {
-      ctx.strokeStyle = (x % major === 0) ? TB.gridMajor : TB.gridMinor;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-    for (let y = 0; y <= h + minor; y += minor) {
-      ctx.strokeStyle = (y % major === 0) ? TB.gridMajor : TB.gridMinor;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-  }
-
-  _drawCoordSystem(x, y) {
-    const ctx = this.ctx;
+  _drawCoordSystemOn(ctx, x, y) {
+    const arrow = (x1, y1, x2, y2) => {
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+      const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - ux * 14 + nx * 6, y2 - uy * 14 + ny * 6);
+      ctx.lineTo(x2 - ux * 14 - nx * 6, y2 - uy * 14 - ny * 6);
+      ctx.closePath(); ctx.fill();
+    };
     ctx.strokeStyle = TB.text; ctx.fillStyle = TB.text; ctx.lineWidth = 3;
-    this._arrow(x, y, x + 72, y);
-    this._arrow(x, y, x, y + 72);
+    arrow(x, y, x + 72, y);
+    arrow(x, y, x, y + 72);
     ctx.font = 'bold 13px Helvetica';
     ctx.fillText('x', x + 80, y + 5);
     ctx.fillText('y', x - 5, y + 90);
   }
 
-  _drawSupport(x, y, type) {
-    const ctx = this.ctx;
-    if (type === 'fixed') {
-      const wx = x - 20;
-      ctx.strokeStyle = TB.blue; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(wx, y - 44); ctx.lineTo(wx, y + 44); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(x + 12, y); ctx.stroke();
-      ctx.lineWidth = 2;
-      for (let off = -42; off <= 48; off += 12) {
-        ctx.beginPath(); ctx.moveTo(wx - 18, y + off + 10); ctx.lineTo(wx, y + off); ctx.stroke();
-      }
-      return;
+  // Mittlere Richtung der angeschlossenen Stäbe, vom Knoten weg zeigend.
+  // Roh (für Label-Platzierung) — null, wenn keine Stäbe anliegen.
+  _awayVec(nodeId) {
+    const n = this._nodeById(nodeId);
+    if (!n) return null;
+    let sx = 0, sy = 0;
+    for (const m of this.members) {
+      let other = null;
+      if (m.start_id === nodeId) other = this._nodeById(m.end_id);
+      else if (m.end_id === nodeId) other = this._nodeById(m.start_id);
+      if (!other) continue;
+      const dx = other.x - n.x, dy = other.y - n.y, len = Math.hypot(dx, dy);
+      if (len > 1e-9) { sx += dx / len; sy += dy / len; }
     }
-    const pts = [x, y + 10, x - 17, y + 40, x + 17, y + 40];
-    ctx.strokeStyle = TB.blue; ctx.fillStyle = '#E8F0FF'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); ctx.lineTo(pts[2], pts[3]); ctx.lineTo(pts[4], pts[5]);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    if (type === 'roller') {
-      ctx.beginPath(); ctx.arc(x - 9, y + 47, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(x + 9, y + 47, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x - 24, y + 55); ctx.lineTo(x + 24, y + 55); ctx.stroke();
-    } else {
-      ctx.beginPath(); ctx.moveTo(x - 23, y + 43); ctx.lineTo(x + 23, y + 43); ctx.stroke();
-    }
+    const len = Math.hypot(sx, sy);
+    if (len < 1e-6) return null;
+    return [-sx / len, -sy / len];
   }
 
-  _drawFreeEnd(x, y) {
+  // Wie _awayVec, aber auf 90°-Schritte gerastert; Default: nach unten.
+  _awayDir(nodeId) {
+    const v = this._awayVec(nodeId);
+    if (!v) return [0, 1];
+    const [ax, ay] = v;
+    if (Math.abs(ax) >= Math.abs(ay)) return [ax >= 0 ? 1 : -1, 0];
+    return [0, ay >= 0 ? 1 : -1];
+  }
+
+  // Lager-Symbole richten sich automatisch nach der Struktur aus: das Symbol
+  // zeigt vom Stabwerk weg (in 90°-Schritten). Kanonische Zeichnung: Symbol
+  // unterhalb des Knotens (away = +y) bzw. Wand links (fixed, away = −x).
+  _drawSupport(x, y, type, nodeId) {
     const ctx = this.ctx;
+    const [ax, ay] = this._awayDir(nodeId);
+    ctx.save();
+    ctx.translate(x, y);
+    if (type === 'fixed') {
+      ctx.rotate(Math.atan2(-ay, -ax));
+      ctx.strokeStyle = TB.blue; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(-20, -44); ctx.lineTo(-20, 44); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(12, 0); ctx.stroke();
+      ctx.lineWidth = 2;
+      for (let off = -42; off <= 48; off += 12) {
+        ctx.beginPath(); ctx.moveTo(-38, off + 10); ctx.lineTo(-20, off); ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+    ctx.rotate(Math.atan2(-ax, ay));
+    ctx.strokeStyle = TB.blue; ctx.fillStyle = '#E8F0FF'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(-17, 40); ctx.lineTo(17, 40);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (type === 'roller') {
+      ctx.beginPath(); ctx.arc(-9, 47, 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(9, 47, 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-24, 55); ctx.lineTo(24, 55); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(-23, 43); ctx.lineTo(23, 43); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  _drawFreeEnd(x, y, nodeId) {
+    const ctx = this.ctx;
+    const [ax, ay] = this._awayVec(nodeId) || [0, -1];
+    // Querstrich senkrecht zur Weg-Richtung, Text dahinter
+    const px = -ay, py = ax;
     ctx.strokeStyle = TB.muted; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x - 12, y - 16); ctx.lineTo(x + 12, y - 16); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + ax * 16 - px * 12, y + ay * 16 - py * 12);
+    ctx.lineTo(x + ax * 16 + px * 12, y + ay * 16 + py * 12);
+    ctx.stroke();
     ctx.fillStyle = TB.muted; ctx.font = 'bold 10px Helvetica'; ctx.textAlign = 'center';
-    ctx.fillText('frei', x, y - 28); ctx.textAlign = 'left';
+    ctx.fillText('frei', x + ax * 30, y + ay * 30 + 3); ctx.textAlign = 'left';
   }
 
   _drawLoad(x, y, fx, fy) {
@@ -756,13 +863,20 @@ class TrussBuilder {
     const ex = x + fx * scale, ey = y + fy * scale;
     ctx.strokeStyle = TB.load; ctx.fillStyle = TB.load; ctx.lineWidth = 3;
     this._arrow(x, y, ex, ey);
+    // Label hinter der Pfeilspitze in Pfeilrichtung — überdeckt nie den Schaft,
+    // egal in welche Richtung die Kraft zeigt.
+    const len = Math.hypot(ex - x, ey - y) || 1;
+    const ux = (ex - x) / len, uy = (ey - y) / len;
     ctx.font = 'bold 11px Helvetica';
-    ctx.fillText(`(${fx}, ${fy}) kN`, (x + ex) / 2 + 10, (y + ey) / 2 - 10);
+    ctx.textAlign = ux < -0.35 ? 'right' : (ux > 0.35 ? 'left' : 'center');
+    ctx.fillText(`(${fx}, ${fy}) kN`, ex + ux * 14, ey + uy * 14 + (uy > 0.35 ? 10 : uy < -0.35 ? -4 : 4));
+    ctx.textAlign = 'left';
   }
 
-  _drawZLoad(x, y, direction) {
+  _drawZLoad(x, y, direction, nodeId) {
     const ctx = this.ctx;
-    const r = 13, cx = x + 20, cy = y - 20;
+    const [ax, ay] = this._awayVec(nodeId) || [0.7, -0.7];
+    const r = 13, cx = x + ax * 30, cy = y + ay * 30;
     ctx.strokeStyle = TB.load; ctx.fillStyle = TB.paper; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.lineWidth = 2.5;
@@ -966,7 +1080,7 @@ class TrussBuilder {
       this._setStatus('Bearbeitungsmodus verlassen.');
     }
     document.getElementById('btn-edit-solution').classList.toggle('btn-mode-active', this.editMode);
-    this.redraw();
+    this.requestRedraw();
   }
 
   _editBarAxes(bar_id) {
