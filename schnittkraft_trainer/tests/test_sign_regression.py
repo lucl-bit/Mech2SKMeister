@@ -97,6 +97,45 @@ class TestFrameFemBaseConvention(unittest.TestCase):
         self.assertAlmostEqual(reactions["mz:1"], -20.0, places=6)
 
 
+class TestBarDirectionDependence(unittest.TestCase):
+    """Das FEM-Ergebnis ist bewusst richtungsabhängig (lokales System folgt
+    der Stabdefinition start→end). Das Frontend kanonisiert deshalb jede
+    Stabrichtung (DrawUtils.isCanonicalDir: lokal-x mit +globaler
+    x-Komponente, vertikal nach unten). Dieser Test pinnt das rohe
+    Backend-Verhalten fest, damit die Frontend-Kanonisierung stabil bleibt."""
+
+    def test_reversed_bar_flips_shear_and_moment_ends(self) -> None:
+        joints = [{"joint_id": 1, "x": 0, "y": 0}, {"joint_id": 2, "x": 4, "y": 0}]
+        sups = [{"joint_id": 1, "support_type": "fixed"}]
+        loads = [{"joint_id": 2, "fx": 0, "fy": 5}]
+        fwd, _ = _solve_frame_builder(
+            joints, [{"bar_id": 1, "start_id": 1, "end_id": 2}], sups, loads, set(), [])
+        rev, _ = _solve_frame_builder(
+            joints, [{"bar_id": 1, "start_id": 2, "end_id": 1}], sups, loads, set(), [])
+        # Kanonisch (1→2): Q konstant +5, M an der Einspannung (start) −20.
+        self.assertAlmostEqual(fwd[1]["Q_start"], 5.0, places=6)
+        self.assertAlmostEqual(fwd[1]["M_start"], -20.0, places=6)
+        # Rückwärts (2→1): Enden getauscht, lokale y-Achse gedreht →
+        # M wandert mit Vorzeichenwechsel ans andere Ende.
+        self.assertAlmostEqual(rev[1]["M_start"], 0.0, places=6)
+        self.assertAlmostEqual(rev[1]["M_end"], 20.0, places=6)
+
+    def test_inclined_bar_udl_acts_in_local_y(self) -> None:
+        # 45°-Stab mit q=1: Streckenlast wirkt in lokal-y (senkrecht zum Stab),
+        # nicht global-vertikal. N ist deshalb konstant ≠ 0.
+        joints = [{"joint_id": 1, "x": 0, "y": 0}, {"joint_id": 2, "x": 4, "y": -4}]
+        bars = [{"bar_id": 1, "start_id": 1, "end_id": 2}]
+        sups = [{"joint_id": 1, "support_type": "pin"},
+                {"joint_id": 2, "support_type": "roller"}]
+        bf, _ = _solve_frame_builder(joints, bars, sups, [], set(),
+                                     [{"bar_id": 1, "q": 1.0}])
+        L = 32 ** 0.5
+        self.assertAlmostEqual(bf[1]["Q_start"], L / 2, places=3)
+        self.assertAlmostEqual(bf[1]["Q_end"], -L / 2, places=3)
+        self.assertAlmostEqual(bf[1]["N_start"], bf[1]["N_end"], places=6)
+        self.assertGreater(abs(bf[1]["N_start"]), 1.0)
+
+
 class TestTrussSolverSigns(unittest.TestCase):
     def test_three_bar_truss_tension_compression(self) -> None:
         # Dreieck: Apex (Knoten 2) OBEN (y=-1.5), Last nach unten (fy=+10).

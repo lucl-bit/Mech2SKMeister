@@ -47,6 +47,18 @@ Netto-Effekt: **M-Bilder unverändert** (Flip × Flip), Labels kurs-korrekt; **Q
 - **Streckenlast** `q=+1` = in +lokal-y (bei horizontalem Stab: nach unten) — konsistent zwischen Fixtures und FEM (`server.py:196`).
 - **Totes Backend-Feature**: `generate_frame_challenge` (Level ≥ 21, handkodierte `sign_library`) ist vom Web-UI aus **unerreichbar** (Modi nutzen Level 1–20). Nicht verifiziert, nicht geändert.
 
+## 3b. Edge-Case-Audit Runde 2 (2026-07-15, Nachprüfung auf Wunsch)
+
+| # | Kandidat | Befund | Maßnahme |
+|---|---|---|---|
+| 1 | Reaktions-Anzeige `RY=-5.00` mit Pfeil nach oben | Verwirrend (y↓-Vorzeichen vs. Pfeilbild) | **Fix (Darstellung)**: Label zeigt Betrag + Richtungspfeil (`V = 5.00 kN ↑`), interne Werte unverändert |
+| 2 | Streckenlast auf geneigtem Stab | FEM wirkt q in **lokal-y** (senkrecht zum Stab), Zeichnung zeigt Pfeile senkrecht zum Stab → konsistent; 45°-Referenz: Q=±qL/2, N konst. ≠ 0 ✓ | Test gepinnt, Statustext im Builder präzisiert („wirkt senkrecht zur Stabachse") |
+| 3 | M_mid-Formel nach M-Flip | Formel rechnet FEM-intern und flippt danach — Standardfall numerisch verifiziert (M_mid,fem=+2 → Kurs −2) | OK, kein Fix |
+| 4 | **Stab-Richtungsabhängigkeit** | **Echter Fehler**: Kragträger 2→1 statt 1→2 liefert M_end=+20/Q-Weltbild gespiegelt — dieselbe Struktur bekam je nach Zeichenreihenfolge andere Vorzeichen | **Fix**: Kanonisierung (lokal-x mit +globaler x-Komponente, vertikal nach unten; `DrawUtils.isCanonicalDir`). Zeichnen-Modus kanonisiert Fixtures beim Laden (inkl. Spiegelung der Fallback-Lösungen, Q mit Vorzeichenflip), Builder kanonisiert Member beim Erstellen |
+| 5 | Z-Lasten `into → +fy` | Builder, Fixtures und `_allLoads` konsistent | OK |
+| 6 | Truss- vs. Frame-Pfad | Gleiches Dreieck: N identisch (−8.333/−8.333/+6.667) | OK, kein Fix |
+| 7 | Kragarm-Quizform `n_left_*` | Handrechnung: N=+fx zwischen Lager und Last, für Pin-Roller und Kragarm gleich — Code korrekt | OK |
+
 ## 4. Regressionstests
 
 `schnittkraft_trainer/tests/test_sign_regression.py` pinnt fest:

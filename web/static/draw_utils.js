@@ -110,6 +110,16 @@ window.DrawUtils = {
     return Math.round(toward / (Math.PI / 2)) * (Math.PI / 2);
   },
 
+  // Kurs-Konvention (FS 2025, D3): lokale Stabachsen folgen den globalen
+  // Achsen. Ein Stab ist "kanonisch", wenn seine lokale x-Achse eine positive
+  // globale x-Komponente hat (vertikale Stäbe: +y, also nach unten).
+  // Ohne Kanonisierung flippen Q-Vorzeichen mit der Zeichenreihenfolge.
+  isCanonicalDir(dx, dy) {
+    if (dx > 1e-9) return true;
+    if (dx < -1e-9) return false;
+    return dy >= 0;
+  },
+
   // Label-Platzierung auf der stabfreien Seite; bei Lagern senkrecht
   // ausweichen, damit das Symbol nicht überdeckt wird.
   labelOffset(x, y, neighbors, isSupported, dist = 17) {

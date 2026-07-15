@@ -146,6 +146,7 @@ class FrameChallenge {
       }
       this.fixture = this._queue.pop();
     }
+    this.fixture = this._canonicalizeFixture(this.fixture);
     if (this.fixture.generated) {
       this.kind = 'N';
     } else if (this.kindFilter && this.kindFilter !== 'mix') {
@@ -169,6 +170,35 @@ class FrameChallenge {
     this.draw();
     await this._computeSolution();
     this.draw();
+  }
+
+  // Stäbe kanonisch orientieren (lokal-x mit +globaler x-Komponente, vertikal
+  // nach unten) — sonst hängen Q-Vorzeichen von der Zeichenreihenfolge der
+  // Fixture ab (Kurs-Konvention: lokale Achsen = globale Achsen).
+  _canonicalizeFixture(fix) {
+    const flipped = new Set();
+    const bars = fix.bars.map(b => {
+      const n1 = fix.nodes[b.from], n2 = fix.nodes[b.to];
+      if (DrawUtils.isCanonicalDir(n2.x - n1.x, n2.y - n1.y)) return b;
+      flipped.add(b.id);
+      return { ...b, from: b.to, to: b.from };
+    });
+    if (!flipped.size) return fix;
+    // Handgeschriebene Fallback-Lösungen mitspiegeln: "s,e" → "e,s";
+    // Q flippt zusätzlich das Vorzeichen (lokale y-Achse dreht mit).
+    const solutions = {};
+    for (const [kind, perBar] of Object.entries(fix.solutions || {})) {
+      solutions[kind] = {};
+      for (const [barId, str] of Object.entries(perBar)) {
+        if (!flipped.has(barId) || typeof str !== 'string' || !str.includes(',')) {
+          solutions[kind][barId] = str;
+          continue;
+        }
+        const [s, e] = str.split(',').map(Number);
+        solutions[kind][barId] = kind === 'Q' ? `${-e || 0},${-s || 0}` : `${e},${s}`;
+      }
+    }
+    return { ...fix, bars, solutions: fix.solutions ? solutions : fix.solutions };
   }
 
   async _computeSolution() {

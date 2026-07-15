@@ -355,7 +355,7 @@ class TrussBuilder {
     else {
       this._pushUndo();
       const idx = this.members.length + 1;
-      this.members.push({ bar_id: idx, start_id: this.activeMemberStart, end_id: node.node_id });
+      this.members.push(this._canonicalMember(idx, this.activeMemberStart, node.node_id));
       this._clearResults();
       this._setStatus(`Stab ${this.activeMemberStart}-${node.node_id} gesetzt.`);
     }
@@ -473,6 +473,16 @@ class TrussBuilder {
 
   _nodeById(id) { return this.nodes.find(n => n.node_id === id); }
 
+  // Stab kanonisch orientieren (Kurs-Konvention: lokale Achsen = globale
+  // Achsen) — sonst hängen Q/M-Vorzeichen von der Klick-Reihenfolge ab.
+  _canonicalMember(barId, aId, bId) {
+    const a = this._nodeById(aId), b = this._nodeById(bId);
+    if (a && b && !DrawUtils.isCanonicalDir(b.x - a.x, b.y - a.y)) {
+      return { bar_id: barId, start_id: bId, end_id: aId };
+    }
+    return { bar_id: barId, start_id: aId, end_id: bId };
+  }
+
   _barHitTest(mx, my, threshold = 14) {
     let best = null, bestD = threshold;
     for (const m of this.members) {
@@ -495,7 +505,7 @@ class TrussBuilder {
       this._setStatus(`Streckenlast von Stab ${bar.bar_id} entfernt.`);
     } else {
       this.distributedLoads[bar.bar_id] = { bar_id: bar.bar_id, q: 1 };
-      this._setStatus(`Streckenlast (q ↓) an Stab ${bar.bar_id} gesetzt.`);
+      this._setStatus(`Streckenlast an Stab ${bar.bar_id} gesetzt — wirkt senkrecht zur Stabachse (bei horizontalen Stäben: nach unten).`);
     }
     this._clearResults();
   }
@@ -901,8 +911,10 @@ class TrussBuilder {
       const ctx = this.ctx;
       ctx.strokeStyle = TB.blue; ctx.fillStyle = TB.blue; ctx.lineWidth = 3;
       this._arrow(n.x, n.y, ex, ey);
+      // Pfeil zeigt die Wirkrichtung, Label den Betrag — kein "-5 nach oben".
+      const dirGlyph = axis === 'rx' ? (value > 0 ? '→' : '←') : (value > 0 ? '↓' : '↑');
       ctx.font = 'bold 10px Helvetica';
-      ctx.fillText(`${axis.toUpperCase()}=${value >= 0 ? '+' : ''}${value.toFixed(2)}`, ex + 8, ey);
+      ctx.fillText(`${axis === 'rx' ? 'H' : 'V'} = ${Math.abs(value).toFixed(2)} kN ${dirGlyph}`, ex + 8, ey);
     }
   }
 
