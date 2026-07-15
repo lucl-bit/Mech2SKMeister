@@ -27,15 +27,23 @@ class FrameChallenge {
     this.showSolution = false;
     this._computedSolution = null;
 
+    this.cutMode = false;
+    this.cut = null;
+    this.cutLine = null;
+    this.cutDragging = false;
+    this._forces = null;
+
     this._onDown = this._onDown.bind(this);
     this._onMove = this._onMove.bind(this);
     this._onUp = this._onUp.bind(this);
     this._onResize = this._onResize.bind(this);
+    this._onKey = this._onKey.bind(this);
     canvas.addEventListener('pointerdown', this._onDown);
     canvas.addEventListener('pointermove', this._onMove);
     canvas.addEventListener('pointerup', this._onUp);
     canvas.addEventListener('pointercancel', this._onUp);
     window.addEventListener('resize', this._onResize);
+    window.addEventListener('keydown', this._onKey);
     canvas.style.cursor = 'pointer';
   }
 
@@ -47,6 +55,7 @@ class FrameChallenge {
     this.canvas.removeEventListener('pointerup', this._onUp);
     this.canvas.removeEventListener('pointercancel', this._onUp);
     window.removeEventListener('resize', this._onResize);
+    window.removeEventListener('keydown', this._onKey);
     for (const barId of ['game-kind-filter', 'game-source-filter']) {
       const bar = document.getElementById(barId);
       if (bar) {
@@ -108,6 +117,7 @@ class FrameChallenge {
     const bb = document.querySelector('#game-view .bottombar');
     if (this._origBottombarHTML === undefined) this._origBottombarHTML = bb.innerHTML;
     bb.innerHTML = `
+      <button class="btn-back" id="fc-cut">✂ Schnitt</button>
       <button class="btn-back" id="fc-solution">Lösung zeigen</button>
       <button class="btn-back" id="fc-clear">Zurücksetzen</button>
       <button class="btn-accent" id="fc-check" style="background:#7C5CE0">Prüfen</button>
@@ -117,6 +127,145 @@ class FrameChallenge {
     document.getElementById('fc-clear').onclick = () => this.clearAnswers();
     document.getElementById('fc-solution').onclick = () => { this.showSolution = !this.showSolution; this.draw(); };
     document.getElementById('fc-next').onclick = () => this.nextChallenge();
+    document.getElementById('fc-cut').onclick = () => this.toggleCutMode();
+  }
+
+  // ===== Schnitt-Tool (Ritter-Schnitt) =====
+
+  toggleCutMode() {
+    this.cutMode = !this.cutMode;
+    this.cutLine = null;
+    this.cutDragging = false;
+    const btn = document.getElementById('fc-cut');
+    if (btn) btn.classList.toggle('fc-cut-active', this.cutMode);
+    this.canvas.style.cursor = this.cutMode ? 'crosshair' : 'pointer';
+    this._updateStatus(this.cutMode
+      ? 'Schnitt-Modus: Ziehe eine Linie durch die Stäbe, die du freischneiden willst (ESC beendet).'
+      : `Aufgabe ${this.challengeNumber}: Zeichne den ${this.kind}-Verlauf.`);
+    this.draw();
+  }
+
+  // Geschnittene Stäbe + Seitenzuordnung der Knoten zur Schnittlinie.
+  _computeCut(line) {
+    const { x1, y1, x2, y2 } = line;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 20) return null;
+    const sideOf = (px, py) => Math.sign((px - x1) * dy - (py - y1) * dx) || 1;
+    const nodeSide = {};
+    for (const [id, [px, py]] of Object.entries(this.pixelNodes)) nodeSide[id] = sideOf(px, py);
+    const cutBars = [];
+    for (const bar of this.fixture.bars) {
+      const s = this.pixelNodes[bar.from], e = this.pixelNodes[bar.to];
+      if (nodeSide[bar.from] === nodeSide[bar.to]) continue;
+      // Schnittpunkt Parameter t entlang des Stabes (Linie als unendlich)
+      const denom = (e[0] - s[0]) * dy - (e[1] - s[1]) * dx;
+      if (Math.abs(denom) < 1e-9) continue;
+      const t = ((x1 - s[0]) * dy - (y1 - s[1]) * dx) / denom;
+      if (t <= 0.02 || t >= 0.98) continue;
+      cutBars.push({ id: bar.id, from: bar.from, to: bar.to, t });
+    }
+    if (!cutBars.length) return null;
+    // Verschiebung: senkrecht zur Schnittlinie, Seite +1 nach +Normale
+    const nx = -dy / len, ny = dx / len;
+    return { line, cutBars, nodeSide, nx, ny };
+  }
+
+  _drawCutOverlay() {
+    const ctx = this.ctx;
+    const cut = this.cut;
+    // Live-Vorschau der Linie beim Ziehen
+    const line = this.cutDragging ? this.cutLine : (cut && cut.line);
+    if (line) {
+      ctx.strokeStyle = FC.red; ctx.lineWidth = 2; ctx.setLineDash([8, 5]);
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Scherensymbol am Linienanfang
+      ctx.font = '16px Helvetica'; ctx.fillStyle = FC.red;
+      ctx.fillText('✂', line.x1 - 8, line.y1 - 6);
+    }
+    if (!cut) return;
+
+    const OFF = 16; // Auseinanderschieben der Hälften
+    const shift = id => {
+      const s = cut.nodeSide[id];
+      return [cut.nx * OFF * s, cut.ny * OFF * s];
+    };
+    const P = id => {
+      const [px, py] = this.pixelNodes[id];
+      const [ox, oy] = shift(id);
+      return [px + ox, py + oy];
+    };
+    const cutIds = new Set(cut.cutBars.map(b => b.id));
+
+    // Struktur der beiden Hälften über das normale Bild legen (abdunkeln)
+    ctx.save();
+    ctx.fillStyle = 'rgba(251,253,255,0.82)';
+    ctx.fillRect(0, 0, this._cssW, this._cssH);
+    ctx.restore();
+
+    // Nicht geschnittene Stäbe verschoben zeichnen
+    ctx.strokeStyle = FC.beam; ctx.lineWidth = 5;
+    for (const bar of this.fixture.bars) {
+      if (cutIds.has(bar.id)) continue;
+      const s = P(bar.from), e = P(bar.to);
+      ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
+    }
+    // Lager + Lasten mitverschieben wäre komplex — Knotenmarker reichen hier
+    for (const [id] of Object.entries(this.pixelNodes)) {
+      const [px, py] = P(id);
+      ctx.fillStyle = FC.paper; ctx.strokeStyle = FC.beam; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = FC.text; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
+      ctx.fillText(id, px, py - 10); ctx.textAlign = 'left';
+    }
+
+    // Geschnittene Stäbe: zwei Stummel + N-Pfeile an beiden Ufern
+    const isFrameFix = (this.fixture.welds || []).length > 0 ||
+      (this.fixture.loads || []).some(l => l.kind === 'distributed');
+    let infoY = 96;
+    for (const cb of cut.cutBars) {
+      const sN = P(cb.from), eN = P(cb.to);
+      const f = (this._forces || {})[cb.id];
+      const t = cb.t;
+      // Uferpunkte auf beiden Hälften (leicht vor dem Schnittpunkt)
+      const faceA = [sN[0] + (eN[0] - sN[0]) * (t - 0.06), sN[1] + (eN[1] - sN[1]) * (t - 0.06)];
+      const faceB = [sN[0] + (eN[0] - sN[0]) * (t + 0.06), sN[1] + (eN[1] - sN[1]) * (t + 0.06)];
+      ctx.strokeStyle = FC.beam; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(sN[0], sN[1]); ctx.lineTo(faceA[0], faceA[1]); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(eN[0], eN[1]); ctx.lineTo(faceB[0], faceB[1]); ctx.stroke();
+
+      if (!f) continue;
+      const Nval = f.N_start + (f.N_end - f.N_start) * t;
+      const dx = eN[0] - sN[0], dy = eN[1] - sN[1], L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const sgn = Math.abs(Nval) < 1e-6 ? 0 : Math.sign(Nval);
+      const color = sgn > 0 ? FC.green : sgn < 0 ? FC.orange : FC.muted;
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5;
+      const alen = 26;
+      if (sgn !== 0) {
+        // Zug: Pfeile zeigen vom Ufer weg entlang der Stabachse (auseinander);
+        // Druck: aufeinander zu — actio = reactio an beiden Ufern sichtbar.
+        DrawUtils._arrowOn(ctx, faceA[0], faceA[1], faceA[0] + ux * alen * sgn, faceA[1] + uy * alen * sgn);
+        DrawUtils._arrowOn(ctx, faceB[0], faceB[1], faceB[0] - ux * alen * sgn, faceB[1] - uy * alen * sgn);
+      }
+      ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
+      const label = sgn === 0 ? `${cb.id}: Nullstab` :
+        `${cb.id}: N = ${Nval > 0 ? '+' : ''}${(+Nval.toFixed(2))} (${sgn > 0 ? 'Zug' : 'Druck'})`;
+      ctx.fillText(label, (faceA[0] + faceB[0]) / 2 - (-uy) * 30, (faceA[1] + faceB[1]) / 2 - ux * 30);
+      ctx.textAlign = 'left';
+
+      // Rahmen: zusätzlich Q/M am Schnittpunkt (M in Kurs-Konvention)
+      if (isFrameFix) {
+        const Qval = f.Q_start + (f.Q_end - f.Q_start) * t;
+        const Mval = -(f.M_start + (f.M_end - f.M_start) * t);
+        ctx.fillStyle = FC.text; ctx.font = '11px Helvetica';
+        ctx.fillText(`Stab ${cb.id} am Schnitt:  N=${Nval.toFixed(2)}  Q=${Qval.toFixed(2)}  M≈${Mval.toFixed(2)} (Kurs-Konvention)`, 42, infoY);
+        infoY += 16;
+      }
+    }
+    ctx.fillStyle = FC.muted; ctx.font = 'bold 11px Helvetica';
+    ctx.fillText('Ritter-Schnitt: an jedem Ufer wirkt die gleiche Stabkraft entgegengesetzt (actio = reactio).', 42, this._cssH - 20);
   }
 
   async loadChallenge() {
@@ -166,6 +315,9 @@ class FrameChallenge {
     this.results = null;
     this.showSolution = false;
     this._computedSolution = null;
+    this._forces = null;
+    if (this.cutMode) this.toggleCutMode();
+    this.cut = null;
     const paraHint = (this.fixture.parabolicBars?.[this.kind] || []).length
       ? ` Stäbe mit Streckenlast haben 3 Handles (Anfang/Mitte/Ende) — q bestimmt die Krümmung der Parabel.`
       : '';
@@ -243,6 +395,13 @@ class FrameChallenge {
         result = await resp.json();
         if (!result.ok) return;
 
+        // Rohwerte fürs Schnitt-Tool aufbewahren (N konstant je Stab)
+        this._forces = {};
+        for (const b of fix.bars) {
+          const f = result.bar_forces[b.id] || 0;
+          this._forces[b.id] = { N_start: f, N_end: f, Q_start: 0, Q_end: 0, M_start: 0, M_end: 0 };
+        }
+
         const allN = fix.bars.map(b => Math.abs(result.bar_forces[b.id] || 0));
         const thrN = 0.05 * Math.max(...allN, 1e-6);
         const sgn = (v, thr) => Math.abs(v) < thr ? '0' : v > 0 ? '1' : '-1';
@@ -265,6 +424,11 @@ class FrameChallenge {
         if (!result.ok) return;
 
         const bf = result.bar_forces;
+        // Rohwerte fürs Schnitt-Tool aufbewahren (M hier noch FEM-Konvention;
+        // Kurs-Umrechnung passiert bei der Anzeige: M_kurs = −M_fem)
+        this._forces = {};
+        for (const b of fix.bars) { if (bf[b.id]) this._forces[b.id] = { ...bf[b.id] }; }
+
         const pick = (key) => fix.bars.flatMap(b => bf[b.id] ? [Math.abs(bf[b.id][key])] : []);
         const thr = (vals) => 0.05 * Math.max(...vals, 1e-6);
         const thrN = thr(pick('N_start').concat(pick('N_end')));
@@ -479,6 +643,14 @@ class FrameChallenge {
   _onDown(e) {
     const r = this.canvas.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (this.cutMode) {
+      this.cutDragging = true;
+      this.cut = null;
+      this.cutLine = { x1: mx, y1: my, x2: mx, y2: my };
+      if (e.pointerId !== undefined) this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      return;
+    }
     const hit = this._hitTestHandles(mx, my);
     if (hit) {
       this.dragging = hit;
@@ -491,6 +663,11 @@ class FrameChallenge {
   _onMove(e) {
     const r = this.canvas.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (this.cutDragging) {
+      this.cutLine.x2 = mx; this.cutLine.y2 = my;
+      this.draw();
+      return;
+    }
     if (this.dragging) {
       const { barId, which } = this.dragging;
       const { s, e: end, nx, ny } = this._barAxes(barId);
@@ -510,11 +687,29 @@ class FrameChallenge {
   }
 
   _onUp() {
+    if (this.cutDragging) {
+      this.cutDragging = false;
+      this.cut = this._computeCut(this.cutLine);
+      if (!this.cut) {
+        this._updateStatus('Kein Stab getroffen — Linie quer durch die Struktur ziehen.');
+      } else {
+        const n = this.cut.cutBars.length;
+        this._updateStatus(n <= 3
+          ? `Schnitt durch ${n} St${n === 1 ? 'ab' : 'äbe'} — klassischer Ritter-Schnitt.`
+          : `Schnitt durch ${n} Stäbe — für einen Ritter-Schnitt maximal 3 schneiden.`);
+      }
+      this.draw();
+      return;
+    }
     if (this.dragging) {
       this.dragging = null;
       this.canvas.style.cursor = 'pointer';
       this.draw();
     }
+  }
+
+  _onKey(e) {
+    if (e.key === 'Escape' && this.cutMode) this.toggleCutMode();
   }
 
   // ===== Drawing =====
@@ -535,6 +730,7 @@ class FrameChallenge {
     this._drawAnswers();
     if (this.showSolution) this._drawSolutionGhost();
     this._drawHandles();
+    if (this.cutMode) this._drawCutOverlay();
   }
 
   _drawGrid(w, h) {

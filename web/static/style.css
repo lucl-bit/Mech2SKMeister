@@ -376,6 +376,9 @@ select {
   font-size: .82rem; line-height: 1.5; color: var(--ink); border-left: 3px solid var(--teal);
 }
 
+/* ---- SCHNITT-TOOL ---- */
+.fc-cut-active { background: #FDECEC !important; border-color: var(--red) !important; color: var(--red); font-weight: 700; }
+
 /* ---- SCOREBOARD ---- */
 .scoreboard-banner { cursor: pointer; transition: border-color .15s; }
 .scoreboard-banner:hover { border-color: var(--ink); }
