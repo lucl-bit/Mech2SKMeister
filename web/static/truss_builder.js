@@ -21,6 +21,11 @@ class TrussBuilder {
     this.freeEnds = new Set();
     this.welds = new Set();        // node_ids that are rigidly welded
     this.loads = {};
+    this.loadsZ = {};
+    this.distributedLoads = {};  // bar_id → { bar_id, q }
+    this.manualSolution = {};   // bar_id → {N:{start,end}, Q:{start,end}, M:{start,end}}
+    this.editMode = false;
+    this.editDragging = null;   // {bar_id, which: 'start'|'end'}
     this.memberForces = {};
     this.beamResults = {};
     this.reactions = {};
@@ -46,18 +51,20 @@ class TrussBuilder {
     this._onRelease = this._onRelease.bind(this);
     this._onResize = this._onResize.bind(this);
     this._onKey = this._onKey.bind(this);
-    canvas.addEventListener('mousedown', this._onPress);
-    canvas.addEventListener('mousemove', this._onMove);
-    canvas.addEventListener('mouseup', this._onRelease);
+    canvas.addEventListener('pointerdown', this._onPress);
+    canvas.addEventListener('pointermove', this._onMove);
+    canvas.addEventListener('pointerup', this._onRelease);
+    canvas.addEventListener('pointercancel', this._onRelease);
     window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this._onKey);
     canvas.style.cursor = 'crosshair';
   }
 
   destroy() {
-    this.canvas.removeEventListener('mousedown', this._onPress);
-    this.canvas.removeEventListener('mousemove', this._onMove);
-    this.canvas.removeEventListener('mouseup', this._onRelease);
+    this.canvas.removeEventListener('pointerdown', this._onPress);
+    this.canvas.removeEventListener('pointermove', this._onMove);
+    this.canvas.removeEventListener('pointerup', this._onRelease);
+    this.canvas.removeEventListener('pointercancel', this._onRelease);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
   }
@@ -74,7 +81,9 @@ class TrussBuilder {
       ['weld',   'Verschweissung','Markiert einen Knoten als biegesteif (überträgt M). Default ist Gelenk.'],
       ['free',   'Freies Ende',   'Markiert einen Knoten ausdrücklich als frei.'],
       ['load',   'Last ziehen',   'Vom Knoten ausgehend in Lastrichtung ziehen.'],
-      ['delete', 'Löschen',       'Klick auf einen Knoten löscht ihn + alle anhängenden Stäbe.'],
+      ['loadz',    'Z-Last ⊗/⊙',    'Klick auf einen Knoten: ⊗ (hinein) → ⊙ (heraus) → entfernen.'],
+      ['distload', 'Streckenlast',  'Klick auf einen Stab: Streckenlast ↓↓↓ ein-/ausschalten.'],
+      ['delete',   'Löschen',       'Klick auf einen Knoten löscht ihn + alle anhängenden Stäbe.'],
     ];
     tools.forEach(([value, label, tip]) => {
       const div = document.createElement('label');
@@ -120,6 +129,8 @@ class TrussBuilder {
       freeEnds: [...this.freeEnds],
       welds: [...this.welds],
       loads: this.loads,
+      loadsZ: this.loadsZ,
+      distributedLoads: this.distributedLoads,
       nextNodeId: this.nextNodeId,
     });
   }
@@ -131,6 +142,8 @@ class TrussBuilder {
     this.freeEnds = new Set(o.freeEnds);
     this.welds = new Set(o.welds);
     this.loads = o.loads;
+    this.loadsZ = o.loadsZ || {};
+    this.distributedLoads = o.distributedLoads || {};
     this.nextNodeId = o.nextNodeId;
     this.activeMemberStart = null;
     this.activeLoadNodeId = null;
@@ -178,6 +191,7 @@ class TrussBuilder {
       weld: 'Verschweissung: Knoten anklicken — toggelt zwischen Gelenk und biegesteifem Anschluss.',
       free: 'Freies Ende: Knoten anklicken.',
       load: 'Last: Vom Knoten in Lastrichtung ziehen.',
+      distload: 'Streckenlast: Stab anklicken — Streckenlast ein-/ausschalten.',
       delete: 'Löschen: Knoten anklicken.',
     };
     this._setStatus(hints[t] || ('Werkzeug aktiv: ' + t));
@@ -214,7 +228,14 @@ class TrussBuilder {
   }
 
   _onPress(e) {
+    if (e.pointerId !== undefined) this.canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
     const [mx, my] = this._pos(e);
+    if (this.editMode) {
+      const hit = this._editHitTest(mx, my);
+      if (hit) { this.editDragging = hit; this.canvas.style.cursor = 'grabbing'; }
+      return;
+    }
     const x = this._snap(mx), y = this._snap(my);
     if (this.tool === 'node')        { this._pushUndo(); this._addNode(x, y); }
     else if (this.tool === 'member') { this._handleMemberTool(mx, my); }
@@ -222,12 +243,27 @@ class TrussBuilder {
     else if (this.tool === 'weld')   { this._pushUndo(); this._toggleWeld(mx, my); }
     else if (this.tool === 'free')   { this._pushUndo(); this._setFree(mx, my); }
     else if (this.tool === 'load')   { this._pushUndo(); this._startLoad(mx, my); }
-    else if (this.tool === 'delete') { this._pushUndo(); this._deleteNearest(mx, my); }
+    else if (this.tool === 'loadz')    { this._pushUndo(); this._toggleZLoad(mx, my); }
+    else if (this.tool === 'distload') { this._pushUndo(); this._toggleDistLoad(mx, my); }
+    else if (this.tool === 'delete')   { this._pushUndo(); this._deleteNearest(mx, my); }
     if (this.tool !== 'load') this.redraw();
   }
 
   _onMove(e) {
     const [mx, my] = this._pos(e);
+    if (this.editMode) {
+      if (this.editDragging) {
+        const { bar_id, which } = this.editDragging;
+        const { nx, ny, s, e: en } = this._editBarAxes(bar_id);
+        const base = which === 'start' ? s : en;
+        const proj = (mx - base[0]) * nx + (my - base[1]) * ny;
+        const level = Math.max(-2, Math.min(2, Math.round(proj / 22)));
+        this.manualSolution[bar_id][this.mode][which] = level;
+      } else {
+        this.canvas.style.cursor = this._editHitTest(mx, my) ? 'grab' : 'default';
+      }
+      this.redraw(); return;
+    }
     this.hoverPos = [mx, my];
     this.hoverNode = this._nearestNode(mx, my, 22);
     if (this.tool === 'load' && this.activeLoadNodeId !== null) {
@@ -237,6 +273,10 @@ class TrussBuilder {
   }
 
   _onRelease(e) {
+    if (this.editMode) {
+      if (this.editDragging) { this.editDragging = null; this.canvas.style.cursor = 'grab'; this.redraw(); }
+      return;
+    }
     if (this.tool !== 'load' || this.activeLoadNodeId === null) return;
     const [mx, my] = this._pos(e);
     this._finishLoad(mx, my);
@@ -330,16 +370,38 @@ class TrussBuilder {
     this._setStatus(`Last an Knoten ${node.node_id}: Fx=${fx} kN, Fy=${fy} kN.`);
   }
 
+  _toggleZLoad(mx, my) {
+    const node = this._nearestNode(mx, my);
+    if (!node) { this._setStatus('Z-Last muss an einem vorhandenen Knoten gesetzt werden.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
+    const id = node.node_id;
+    const existing = this.loadsZ[id];
+    if (!existing) {
+      this.loadsZ[id] = { node_id: id, fz: 1, direction: 'into' };
+      this._setStatus(`Z-Last ⊗ (hinein) an Knoten ${id}.`);
+    } else if (existing.direction === 'into') {
+      this.loadsZ[id] = { node_id: id, fz: 1, direction: 'out' };
+      this._setStatus(`Z-Last ⊙ (heraus) an Knoten ${id}.`);
+    } else {
+      delete this.loadsZ[id];
+      this._setStatus(`Z-Last an Knoten ${id} entfernt.`);
+    }
+    this._clearResults();
+  }
+
   _deleteNearest(mx, my) {
     const node = this._nearestNode(mx, my);
     if (!node) { this._setStatus('Kein Knoten in der Nähe.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
     const id = node.node_id;
     this.nodes = this.nodes.filter(n => n.node_id !== id);
+    for (const m of this.members) {
+      if (m.start_id === id || m.end_id === id) delete this.distributedLoads[m.bar_id];
+    }
     this.members = this.members.filter(m => m.start_id !== id && m.end_id !== id);
     delete this.supports[id];
     this.freeEnds.delete(id);
     this.welds.delete(id);
     delete this.loads[id];
+    delete this.loadsZ[id];
     if (this.activeMemberStart === id) this.activeMemberStart = null;
     this._clearResults();
     this._setStatus(`Knoten ${id} gelöscht.`);
@@ -356,12 +418,39 @@ class TrussBuilder {
 
   _nodeById(id) { return this.nodes.find(n => n.node_id === id); }
 
+  _barHitTest(mx, my, threshold = 14) {
+    let best = null, bestD = threshold;
+    for (const m of this.members) {
+      const s = this._nodeById(m.start_id), e = this._nodeById(m.end_id);
+      if (!s || !e) continue;
+      const dx = e.x - s.x, dy = e.y - s.y, L2 = dx * dx + dy * dy;
+      if (L2 < 1e-9) continue;
+      const t = Math.max(0, Math.min(1, ((mx - s.x) * dx + (my - s.y) * dy) / L2));
+      const d = Math.hypot(mx - (s.x + t * dx), my - (s.y + t * dy));
+      if (d < bestD) { best = m; bestD = d; }
+    }
+    return best;
+  }
+
+  _toggleDistLoad(mx, my) {
+    const bar = this._barHitTest(mx, my);
+    if (!bar) { this._setStatus('Streckenlast: Näher an einen Stab klicken.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
+    if (this.distributedLoads[bar.bar_id]) {
+      delete this.distributedLoads[bar.bar_id];
+      this._setStatus(`Streckenlast von Stab ${bar.bar_id} entfernt.`);
+    } else {
+      this.distributedLoads[bar.bar_id] = { bar_id: bar.bar_id, q: 1 };
+      this._setStatus(`Streckenlast (q ↓) an Stab ${bar.bar_id} gesetzt.`);
+    }
+    this._clearResults();
+  }
+
   _clearResults() { this.memberForces = {}; this.beamResults = {}; this.reactions = {}; }
 
   clear() {
     this._pushUndo();
     this.nodes = []; this.members = []; this.supports = {};
-    this.freeEnds = new Set(); this.welds = new Set(); this.loads = {};
+    this.freeEnds = new Set(); this.welds = new Set(); this.loads = {}; this.loadsZ = {}; this.distributedLoads = {};
     this.memberForces = {}; this.beamResults = {}; this.reactions = {};
     this.nextNodeId = 1; this.activeMemberStart = null;
     this.activeLoadNodeId = null; this.previewLoadEnd = null;
@@ -393,34 +482,80 @@ class TrussBuilder {
     this.redraw();
   }
 
+  _isFrame() { return this.welds.size > 0; }
+
   validate() {
     const j = this.nodes.length, m = this.members.length;
     if (this._cantileverCase()) { this._setStatus('Kragträger erkannt: Berechnen ist möglich.'); return; }
-    const r = Object.values(this.supports).reduce((s, t) => s + (t === 'pin' || t === 'fixed' ? 2 : 1), 0);
-    const left = m + r, right = 2 * j;
-    if (j < 2) this._setStatus('Noch zu wenige Knoten.');
-    else if (m === 0) this._setStatus('Noch keine Stäbe gesetzt.');
-    else if (r < 3) this._setStatus('Noch nicht ausreichend gelagert.');
-    else if (left === right) this._setStatus('Zählkriterium erfüllt: m + r = 2j.');
-    else if (left < right) this._setStatus('System wirkt unterbestimmt.');
-    else this._setStatus('System wirkt überbestimmt.');
+
+    if (this._isFrame()) {
+      // Frame formula: 3m + r = 3j + g
+      // r: fixed=3, pin=2, roller=1
+      // g: internal hinges — non-welded nodes connecting ≥2 members contribute (k−1) each
+      const r = Object.values(this.supports).reduce((s, t) =>
+        s + (t === 'fixed' ? 3 : t === 'pin' ? 2 : 1), 0);
+      const barsAtNode = {};
+      this.members.forEach(mb => {
+        barsAtNode[mb.start_id] = (barsAtNode[mb.start_id] || 0) + 1;
+        barsAtNode[mb.end_id]   = (barsAtNode[mb.end_id]   || 0) + 1;
+      });
+      let g = 0;
+      for (const [nid, cnt] of Object.entries(barsAtNode)) {
+        if (!this.welds.has(Number(nid)) && cnt >= 2) g += cnt - 1;
+      }
+      const left = 3 * m + r, right = 3 * j + g;
+      if (j < 2) this._setStatus('Noch zu wenige Knoten.');
+      else if (m === 0) this._setStatus('Noch keine Stäbe gesetzt.');
+      else if (r < 3) this._setStatus('Noch nicht ausreichend gelagert.');
+      else if (left === right) this._setStatus(`Rahmen: 3m+r = 3j+g = ${right} ✓ Berechnen möglich.`);
+      else if (left < right) this._setStatus(`Rahmen: 3m+r=${left} < 3j+g=${right} → unterbestimmt.`);
+      else this._setStatus(`Rahmen: 3m+r=${left} > 3j+g=${right} → überbestimmt.`);
+    } else {
+      // Truss formula: m + r = 2j
+      const r = Object.values(this.supports).reduce((s, t) => s + (t === 'pin' || t === 'fixed' ? 2 : 1), 0);
+      const left = m + r, right = 2 * j;
+      if (j < 2) this._setStatus('Noch zu wenige Knoten.');
+      else if (m === 0) this._setStatus('Noch keine Stäbe gesetzt.');
+      else if (r < 3) this._setStatus('Noch nicht ausreichend gelagert.');
+      else if (left === right) this._setStatus(`Fachwerk: m+r = 2j = ${right} ✓ Berechnen möglich.`);
+      else if (left < right) this._setStatus('System wirkt unterbestimmt.');
+      else this._setStatus('System wirkt überbestimmt.');
+    }
   }
 
   async solve() {
     const cantilever = this._cantileverCase();
     if (cantilever) { this._solveCantilever(cantilever); return; }
 
+    if (this._isFrame() || Object.keys(this.distributedLoads).length > 0) {
+      await this._solveFrame();
+    } else {
+      await this._solveTruss();
+    }
+  }
+
+  // Merges in-plane loads and z-loads (fz treated as fy — same sign pattern for planar structures)
+  _allLoads() {
+    const map = {};
+    for (const l of Object.values(this.loads))
+      map[l.node_id] = { joint_id: l.node_id, fx: l.fx, fy: l.fy };
+    for (const lz of Object.values(this.loadsZ)) {
+      const sign = lz.direction === 'into' ? 1 : -1;
+      if (map[lz.node_id]) map[lz.node_id].fy += sign * lz.fz;
+      else map[lz.node_id] = { joint_id: lz.node_id, fx: 0, fy: sign * lz.fz };
+    }
+    return Object.values(map);
+  }
+
+  async _solveTruss() {
     const body = {
       joints: this.nodes.map(n => ({ joint_id: n.node_id, x: n.x, y: n.y })),
       bars: this.members.map(m => ({ bar_id: m.bar_id, start_id: m.start_id, end_id: m.end_id })),
-      loads: Object.values(this.loads).map(l => ({ joint_id: l.node_id, fx: l.fx, fy: l.fy })),
+      loads: this._allLoads(),
       supports: Object.entries(this.supports).map(([id, t]) => ({ joint_id: Number(id), support_type: t })),
     };
-
     const resp = await fetch('/api/solve-truss', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const result = await resp.json();
     if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.redraw(); return; }
@@ -430,9 +565,36 @@ class TrussBuilder {
     this.reactions = result.reactions;
     this.beamResults = {};
 
-    const tension = Object.values(this.memberForces).filter(v => v > 1e-6).length;
+    const tension     = Object.values(this.memberForces).filter(v => v >  1e-6).length;
     const compression = Object.values(this.memberForces).filter(v => v < -1e-6).length;
     this._setStatus(`Berechnet: ${tension} Zugstäbe, ${compression} Druckstäbe. Wähle N, Q oder M.`);
+    this.redraw();
+  }
+
+  async _solveFrame() {
+    const body = {
+      joints:   this.nodes.map(n => ({ joint_id: n.node_id, x: n.x, y: n.y })),
+      bars:     this.members.map(m => ({ bar_id: m.bar_id, start_id: m.start_id, end_id: m.end_id })),
+      loads:    this._allLoads(),
+      supports: Object.entries(this.supports).map(([id, t]) => ({ joint_id: Number(id), support_type: t })),
+      welds:    [...this.welds],
+      distributed_loads: Object.values(this.distributedLoads),
+    };
+    const resp = await fetch('/api/solve-frame', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!result.ok) { this._setStatus('Nicht lösbar: ' + result.error); this._clearResults(); this.redraw(); return; }
+
+    this.memberForces = {};
+    this.beamResults  = {};
+    for (const [k, v] of Object.entries(result.bar_forces)) {
+      const bid = Number(k);
+      const bar = this.members.find(m => m.bar_id === bid);
+      this.beamResults[bid] = { ...v, start_id: bar.start_id, end_id: bar.end_id };
+    }
+    this.reactions = result.reactions;
+    this._setStatus('Rahmen berechnet. Wähle N, Q oder M.');
     this.redraw();
   }
 
@@ -458,13 +620,20 @@ class TrussBuilder {
     const nx = -uy, ny = ux;
     const normal = load.fx * ux + load.fy * uy;
     const shear  = load.fx * nx + load.fy * ny;
-    const moment = shear * len / this.SNAP;
+    // Auflagermoment (Reaktion gegen die Last) -- positives Vorzeichen entspricht
+    // CCW-Reaktion am Einspannknoten.
+    const reactionMz = shear * len / this.SNAP;
+    // Inneres Biegemoment M an der Einspannung hat das umgekehrte Vorzeichen
+    // (Konvention: M+ = Zug auf der "unteren" Faser bzw. +n-Seite des Stabes).
+    // Beim Kragträger mit Last am freien Ende ist die Zugfaser auf der Lastseite
+    // gegenüber -> M ist negativ.
+    const moment = -reactionMz;
     this.memberForces = {};
     this.beamResults = { [mem.bar_id]: { fixed_id: fixed.node_id, free_id: free.node_id, normal, shear, moment } };
     this.reactions = {
       [`rx:${fixed.node_id}`]: -load.fx,
       [`ry:${fixed.node_id}`]: -load.fy,
-      [`mz:${fixed.node_id}`]: moment,
+      [`mz:${fixed.node_id}`]: reactionMz,
     };
     this._setStatus('Kragträger berechnet: N/Q/M sind jetzt verfügbar.');
     this.redraw();
@@ -522,7 +691,18 @@ class TrussBuilder {
       const n = this._nodeById(load.node_id);
       if (n) this._drawLoad(n.x, n.y, load.fx, load.fy);
     }
+    for (const lz of Object.values(this.loadsZ)) {
+      const n = this._nodeById(lz.node_id);
+      if (n) this._drawZLoad(n.x, n.y, lz.direction);
+    }
+    for (const dl of Object.values(this.distributedLoads)) {
+      const bar = this.members.find(m => m.bar_id === dl.bar_id);
+      if (!bar) continue;
+      const s = this._nodeById(bar.start_id), e = this._nodeById(bar.end_id);
+      if (s && e) this._drawDistributedLoad(s.x, s.y, e.x, e.y);
+    }
     this._drawReactions();
+    this._drawEditOverlay();
 
     if (this.activeLoadNodeId !== null && this.previewLoadEnd) {
       const n = this._nodeById(this.activeLoadNodeId);
@@ -614,6 +794,50 @@ class TrussBuilder {
     ctx.fillText(`(${fx}, ${fy}) kN`, (x + ex) / 2 + 10, (y + ey) / 2 - 10);
   }
 
+  _drawZLoad(x, y, direction) {
+    const ctx = this.ctx;
+    const r = 13, cx = x + 20, cy = y - 20;
+    ctx.strokeStyle = TB.load; ctx.fillStyle = TB.paper; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 2.5;
+    if (direction === 'into') {
+      ctx.strokeStyle = TB.load;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.6, cy - r * 0.6); ctx.lineTo(cx + r * 0.6, cy + r * 0.6);
+      ctx.moveTo(cx + r * 0.6, cy - r * 0.6); ctx.lineTo(cx - r * 0.6, cy + r * 0.6);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = TB.load;
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = TB.load; ctx.font = 'bold 10px Helvetica';
+    ctx.fillText(direction === 'into' ? '⊗ Z' : '⊙ Z', cx + r + 4, cy + 4);
+    ctx.strokeStyle = TB.load; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx - r * 0.7, cy + r * 0.7); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  _drawDistributedLoad(x1, y1, x2, y2) {
+    const ctx = this.ctx;
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+    if (len < 1e-9) return;
+    const nx = -dy / len, ny = dx / len;  // CCW 90° normal
+    const off = 28;
+    // offset line (on the -normal side = "above" for horizontal bars going right)
+    const ax = nx * (-off), ay = ny * (-off);
+    ctx.strokeStyle = TB.load; ctx.fillStyle = TB.load; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1 + ax, y1 + ay); ctx.lineTo(x2 + ax, y2 + ay); ctx.stroke();
+    const N = 6;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const px = x1 + (x2 - x1) * t + ax, py = y1 + (y2 - y1) * t + ay;
+      const qx = x1 + (x2 - x1) * t,      qy = y1 + (y2 - y1) * t;
+      this._arrow(px, py, qx - nx * 4, qy - ny * 4);
+    }
+    ctx.fillStyle = TB.load; ctx.font = 'bold 11px Helvetica';
+    ctx.fillText('q', (x1 + x2) / 2 + nx * (-off - 12), (y1 + y2) / 2 + ny * (-off - 12));
+  }
+
   _drawReactions() {
     for (const [name, value] of Object.entries(this.reactions)) {
       const [axis, rawId] = name.split(':');
@@ -668,9 +892,53 @@ class TrussBuilder {
   }
 
   _drawBeamResponse(s, e, br) {
-    if (this.mode === 'N') this._drawConstantBeamResponse(s, e, br.normal, 'N');
-    else if (this.mode === 'Q') this._drawConstantBeamResponse(s, e, br.shear, 'Q');
-    else this._drawMomentBeamResponse(s, e, br.moment);
+    if ('N_start' in br) {
+      // General frame result with start/end values
+      if (this.mode === 'N') this._drawLinearResponse(s, e, br.N_start, br.N_end, 'N');
+      else if (this.mode === 'Q') this._drawLinearResponse(s, e, br.Q_start, br.Q_end, 'Q');
+      else this._drawLinearResponse(s, e, br.M_start, br.M_end, 'M');
+    } else {
+      // Cantilever fallback
+      if (this.mode === 'N') this._drawConstantBeamResponse(s, e, br.normal, 'N');
+      else if (this.mode === 'Q') this._drawConstantBeamResponse(s, e, br.shear, 'Q');
+      else this._drawMomentBeamResponse(s, e, br.moment);
+    }
+  }
+
+  _drawLinearResponse(s, e, v_start, v_end, mode) {
+    const colors = { N: TB.green, Q: TB.purple, M: TB.red };
+    const fills  = { N: { pos: '#E4F4EA', neg: '#FFF0DF' }, Q: { pos: '#F0EAFE', neg: '#F0EAFE' }, M: { pos: '#FDECEC', neg: '#FDECEC' } };
+    const color  = colors[mode];
+
+    if (Math.abs(v_start) < 1e-6 && Math.abs(v_end) < 1e-6) { this._drawZeroResponse(s, e, mode); return; }
+
+    const dx = e.x - s.x, dy = e.y - s.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return;
+    const nx = -dy / len, ny = dx / len;
+
+    const maxAbs = Math.max(Math.abs(v_start), Math.abs(v_end));
+    const scale  = Math.min(68, 20 + maxAbs * 2.5) / maxAbs;
+    const sx = s.x + nx * v_start * scale, sy = s.y + ny * v_start * scale;
+    const ex = e.x + nx * v_end   * scale, ey = e.y + ny * v_end   * scale;
+
+    const dominant = Math.abs(v_start) >= Math.abs(v_end) ? v_start : v_end;
+    const fill = mode === 'M' ? fills.M.pos : (dominant >= 0 ? fills[mode].pos : fills[mode].neg);
+
+    const ctx = this.ctx;
+    ctx.fillStyle = fill; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+
+    const mid = (v_start + v_end) / 2;
+    this._responseLabel((s.x + e.x + sx + ex) / 4, (s.y + e.y + sy + ey) / 4, mid >= 0 ? '+' : '-', color);
+    this._valueLabel(sx, sy, `${mode}=${v_start >= 0 ? '+' : ''}${v_start.toFixed(2)}`, color);
+    if (Math.abs(v_end - v_start) > 0.05) {
+      this._valueLabel(ex, ey, `${mode}=${v_end >= 0 ? '+' : ''}${v_end.toFixed(2)}`, color);
+    }
   }
 
   _drawConstantBeamResponse(s, e, value, mode) {
@@ -754,5 +1022,264 @@ class TrussBuilder {
     ctx.lineTo(x2 - ux * 14 + nx * 6, y2 - uy * 14 + ny * 6);
     ctx.lineTo(x2 - ux * 14 - nx * 6, y2 - uy * 14 - ny * 6);
     ctx.closePath(); ctx.fill();
+  }
+
+  // ===== MANUAL SOLUTION EDIT =====
+
+  toggleEditMode() {
+    if (!this.members.length) { this._setStatus('Erst Struktur bauen.'); return; }
+    this.editMode = !this.editMode;
+    if (this.editMode) {
+      // Init manualSolution for every bar that has no entry yet
+      for (const m of this.members) {
+        if (!this.manualSolution[m.bar_id]) {
+          this.manualSolution[m.bar_id] = {
+            N: { start: 0, end: 0 },
+            Q: { start: 0, end: 0 },
+            M: { start: 0, end: 0 },
+          };
+        }
+      }
+      this.canvas.style.cursor = 'grab';
+      this._setStatus('Beanspruchung bearbeiten: Handles ziehen. N/Q/M wechseln mit den Buttons.');
+    } else {
+      this.canvas.style.cursor = 'crosshair';
+      this._setStatus('Bearbeitungsmodus verlassen.');
+    }
+    document.getElementById('btn-edit-solution').classList.toggle('btn-mode-active', this.editMode);
+    this.redraw();
+  }
+
+  _editBarAxes(bar_id) {
+    const m = this.members.find(mb => mb.bar_id === bar_id);
+    const s = this._nodeById(m.start_id), e = this._nodeById(m.end_id);
+    const dx = e.x - s.x, dy = e.y - s.y;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux;
+    return { s: [s.x, s.y], e: [e.x, e.y], nx, ny, len };
+  }
+
+  _editHandlePos(bar_id, which) {
+    const { s, e, nx, ny } = this._editBarAxes(bar_id);
+    const val = this.manualSolution[bar_id][this.mode][which];
+    const base = which === 'start' ? s : e;
+    return [base[0] + nx * val * 22, base[1] + ny * val * 22];
+  }
+
+  _editHitTest(mx, my) {
+    if (!this.editMode) return null;
+    for (const m of this.members) {
+      for (const which of ['start', 'end']) {
+        const [px, py] = this._editHandlePos(m.bar_id, which);
+        if (Math.hypot(px - mx, py - my) < 15) return { bar_id: m.bar_id, which };
+      }
+    }
+    return null;
+  }
+
+  _drawEditOverlay() {
+    if (!this.editMode) return;
+    const colors = { N: TB.green, Q: TB.purple, M: TB.red };
+    const color = colors[this.mode];
+    const ctx = this.ctx;
+
+    for (const m of this.members) {
+      const ms = this.manualSolution[m.bar_id];
+      if (!ms) continue;
+      const { s, e, nx, ny } = this._editBarAxes(m.bar_id);
+      const vs = ms[this.mode].start, ve = ms[this.mode].end;
+      const STEP = 22;
+      const sx = s[0] + nx * vs * STEP, sy = s[1] + ny * vs * STEP;
+      const ex = e[0] + nx * ve * STEP, ey = e[1] + ny * ve * STEP;
+
+      ctx.fillStyle = color + '28'; ctx.strokeStyle = color; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.lineTo(ex, ey); ctx.lineTo(sx, sy);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+
+      // Handles
+      for (const which of ['start', 'end']) {
+        const [px, py] = this._editHandlePos(m.bar_id, which);
+        const val = ms[this.mode][which];
+        const fill = val === 0 ? TB.paper : (val > 0 ? TB.green : TB.orange);
+        ctx.fillStyle = fill; ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        if (val !== 0) {
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Helvetica'; ctx.textAlign = 'center';
+          ctx.fillText(val > 0 ? '+' : '−', px, py + 4); ctx.textAlign = 'left';
+        }
+      }
+    }
+
+    // Banner
+    ctx.fillStyle = 'rgba(47,111,237,0.10)';
+    ctx.fillRect(0, 0, this._cssW, 28);
+    ctx.fillStyle = TB.blue; ctx.font = 'bold 12px Helvetica';
+    ctx.fillText(`✏ Beanspruchung bearbeiten — ${this.mode}  (Handles ziehen, ±2 Stufen)`, 12, 18);
+  }
+
+  // ===== EXPORT TO COLLECTION =====
+
+  _fixtureSignStr(v) {
+    return Math.abs(v) < 0.001 ? '0' : v > 0 ? '1' : '-1';
+  }
+
+  _triggerDownload(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  exportToCollection() {
+    const hasTruss  = Object.keys(this.memberForces).length > 0;
+    const hasBeam   = Object.keys(this.beamResults).length > 0;
+    const hasManual = Object.keys(this.manualSolution).length > 0;
+    if (!hasTruss && !hasBeam && !hasManual) {
+      alert('Bitte erst "Berechnen" klicken oder Beanspruchung manuell einzeichnen!');
+      return;
+    }
+
+    const SNAP = this.SNAP;
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    // Knoten sortiert nach node_id → Labels A, B, C, ...
+    const sortedNodes = [...this.nodes].sort((a, b) => a.node_id - b.node_id);
+    const nodeLabels = {};
+    sortedNodes.forEach((n, i) => { nodeLabels[n.node_id] = letters[i] || `N${i}`; });
+
+    // Koordinaten in Grid-Einheiten, y-Achse flippen
+    const canvasYs = sortedNodes.map(n => n.y);
+    const maxCanvasY = Math.max(...canvasYs);
+    const rawCoords = {};
+    sortedNodes.forEach(n => {
+      rawCoords[n.node_id] = { x: n.x / SNAP, y: (maxCanvasY - n.y) / SNAP };
+    });
+    const minX = Math.min(...Object.values(rawCoords).map(c => c.x));
+    const minY = Math.min(...Object.values(rawCoords).map(c => c.y));
+
+    const nodes = {};
+    sortedNodes.forEach(n => {
+      const label = nodeLabels[n.node_id];
+      nodes[label] = {
+        x: Math.round((rawCoords[n.node_id].x - minX) * 100) / 100,
+        y: Math.round((rawCoords[n.node_id].y - minY) * 100) / 100,
+      };
+    });
+
+    // Bars
+    const bars = this.members.map(m => ({
+      id: nodeLabels[m.start_id] + nodeLabels[m.end_id],
+      from: nodeLabels[m.start_id],
+      to: nodeLabels[m.end_id],
+    }));
+
+    // Supports
+    const supports = {};
+    for (const [nid, type] of Object.entries(this.supports)) {
+      supports[nodeLabels[Number(nid)]] = type;
+    }
+
+    // Welds + freeEnds
+    const welds = [...this.welds].map(nid => nodeLabels[nid]).filter(Boolean);
+    const freeEnds = [...this.freeEnds].map(nid => nodeLabels[nid]).filter(Boolean);
+
+    // Loads
+    const loads = Object.values(this.loads).map(l => ({
+      kind: 'point',
+      node: nodeLabels[l.node_id],
+      fx: Math.round(l.fx * 1000) / 1000,
+      fy: Math.round(l.fy * 1000) / 1000,
+      label: 'F',
+    }));
+    for (const lz of Object.values(this.loadsZ)) {
+      loads.push({
+        kind: 'z',
+        node: nodeLabels[lz.node_id],
+        fz: lz.fz,
+        direction: lz.direction,
+        label: 'P',
+      });
+    }
+
+    // Solutions
+    const ss = this._fixtureSignStr.bind(this);
+    const N_sol = {}, Q_sol = {}, M_sol = {};
+
+    for (const bar of bars) {
+      const m = this.members.find(mb =>
+        nodeLabels[mb.start_id] + nodeLabels[mb.end_id] === bar.id);
+
+      const ms = this.manualSolution[m.bar_id];
+      if (ms) {
+        // Manual solution takes priority
+        const sgn = v => v > 0 ? '1' : v < 0 ? '-1' : '0';
+        N_sol[bar.id] = `${sgn(ms.N.start)},${sgn(ms.N.end)}`;
+        Q_sol[bar.id] = `${sgn(ms.Q.start)},${sgn(ms.Q.end)}`;
+        M_sol[bar.id] = `${sgn(ms.M.start)},${sgn(ms.M.end)}`;
+      } else if (hasTruss) {
+        const f = this.memberForces[m.bar_id] ?? 0;
+        const s = ss(f);
+        N_sol[bar.id] = `${s},${s}`; Q_sol[bar.id] = '0,0'; M_sol[bar.id] = '0,0';
+      } else {
+        const br = this.beamResults[m.bar_id];
+        if (!br) { N_sol[bar.id] = '0,0'; Q_sol[bar.id] = '0,0'; M_sol[bar.id] = '0,0'; continue; }
+        if ('N_start' in br) {
+          N_sol[bar.id] = `${ss(br.N_start)},${ss(br.N_end)}`;
+          Q_sol[bar.id] = `${ss(br.Q_start)},${ss(br.Q_end)}`;
+          M_sol[bar.id] = `${ss(br.M_start)},${ss(br.M_end)}`;
+        } else {
+          const nS = ss(br.normal); N_sol[bar.id] = `${nS},${nS}`;
+          const qS = ss(br.shear);  Q_sol[bar.id] = `${qS},${qS}`;
+          const fromIsFixed = m.start_id === br.fixed_id;
+          const mFixed = ss(br.moment);
+          M_sol[bar.id] = fromIsFixed ? `${mFixed},0` : `0,${mFixed}`;
+        }
+      }
+    }
+
+    // BBox
+    const xs = Object.values(nodes).map(n => n.x);
+    const ys = Object.values(nodes).map(n => n.y);
+    const bbox = {
+      w: Math.max(...xs) + 2,
+      h: Math.max(...ys) + 2,
+    };
+
+    const title = prompt('Titel der Aufgabe (z.B. "Dachfachwerk HS 2022"):') ?? '';
+    if (title === null) return; // Abbrechen
+    const source = prompt('Quelle (z.B. "Prüfung HS 2022, Aufgabe 3"):') ?? '';
+
+    const fixture = {
+      id: `custom_${Date.now()}`,
+      title: title || 'Eigenes Fachwerk',
+      source: source || undefined,
+      bbox,
+      nodes,
+      bars,
+      supports,
+      ...(welds.length > 0 ? { welds } : {}),
+      ...(freeEnds.length > 0 ? { freeEnds } : {}),
+      loads,
+      solutions: { N: N_sol, Q: Q_sol, M: M_sol },
+    };
+
+    const col = JSON.parse(localStorage.getItem('examCollection') || '[]');
+    col.push(fixture);
+    localStorage.setItem('examCollection', JSON.stringify(col));
+
+    this._triggerDownload(fixture, `fixture_${fixture.id}.json`);
+    this._setStatus(`"${fixture.title}" zur Sammlung hinzugefügt (${col.length} total).`);
+  }
+
+  downloadCollection() {
+    const col = JSON.parse(localStorage.getItem('examCollection') || '[]');
+    if (!col.length) { alert('Sammlung ist leer – erst "Zur Sammlung hinzufügen" klicken.'); return; }
+    this._triggerDownload(col, 'exam_collection.json');
+    this._setStatus(`${col.length} Fixture(s) heruntergeladen.`);
   }
 }

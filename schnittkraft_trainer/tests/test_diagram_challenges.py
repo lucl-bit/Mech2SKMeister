@@ -44,19 +44,22 @@ class TestDiagramChallenges(unittest.TestCase):
             self.assertNotEqual(default_shape, alternative_shape)
 
     def test_uni_cantilever_moment_is_hogging_positive(self) -> None:
-        challenge = generate_beam_challenge(
-            SignConvention(
-                name="Uni",
-                moment_positive=MomentPositive.HOGGING,
-            ),
-            seed=5,
-        )
-
-        correct_shape = next(option.shape for option in challenge.options if option.is_correct)
-
-        self.assertEqual(challenge.system_type, "cantilever_left")
-        self.assertEqual(challenge.diagram_kind, DiagramKind.MOMENT)
-        self.assertEqual(correct_shape, "moment_cantilever_positive")
+        # Search across seeds for a cantilever-moment challenge: the variability
+        # changes in generate_beam_challenge make any single seed brittle, but the
+        # convention assertion below must hold for ALL such challenges.
+        convention = SignConvention(name="Uni", moment_positive=MomentPositive.HOGGING)
+        found = False
+        for seed in range(200):
+            challenge = generate_beam_challenge(convention, seed=seed)
+            if (
+                challenge.system_type == "cantilever_left"
+                and challenge.diagram_kind is DiagramKind.MOMENT
+            ):
+                correct_shape = next(o.shape for o in challenge.options if o.is_correct)
+                self.assertEqual(correct_shape, "moment_cantilever_positive")
+                found = True
+                break
+        self.assertTrue(found, "expected at least one cantilever+moment challenge in 200 seeds")
 
     def test_game_challenge_progression_adds_trusses_after_ten(self) -> None:
         early = generate_game_challenge(DEFAULT_CONVENTION, challenge_number=10, seed=2)

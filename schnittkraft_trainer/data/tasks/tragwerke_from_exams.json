@@ -1,0 +1,1377 @@
+[
+  {
+    "task_id": "fs2023_frageb1",
+    "source_pdf": "FS 2023.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Deformierbares Tragwerk mit Balkenelementen",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 3.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "E",
+        "x": 2.0,
+        "y": 2.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "C",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "D",
+        "support_type": "pin"
+      },
+      {
+        "node_id": "E",
+        "support_type": "pin"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "A",
+        "fx": 0,
+        "fy": "F",
+        "label": "F"
+      }
+    ],
+    "notes": "Geschweisstes Tragwerk mit Balkenelementen unter Vertikalkraft an Stelle A.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2020_fragec1",
+    "source_pdf": "FS 2020.pdf",
+    "source_task_label": "Frage C1",
+    "source_page": 10,
+    "title": "Statisch bestimmtes System II unter Streckenlast q",
+    "structure_type": "beam",
+    "nodes": [
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 1.0,
+        "y": 0.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "C",
+        "support_type": "pin"
+      },
+      {
+        "node_id": "D",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "distributed",
+        "member_id": 1,
+        "q": "q",
+        "direction": "perpendicular",
+        "label": "q"
+      }
+    ],
+    "notes": "Biegemomentenverlauf M_z(x) im Bereich C-D für verschiedene Antwortmöglichkeiten gezeigt.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2020_frageb1",
+    "source_pdf": "HS 2020.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Rahmentragwerk mit Biegung und Normalkraft",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 2.0,
+        "y": 1.5
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      },
+      {
+        "node_id": "D",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "distributed",
+        "member_id": 2,
+        "q": "q",
+        "direction": "global_y",
+        "label": "q"
+      }
+    ],
+    "notes": "Dreigelenkrahmen mit Streckenlast auf Riegel B-C, alle Balken gleiche Steifigkeiten.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2020_fragec1",
+    "source_pdf": "HS 2020.pdf",
+    "source_task_label": "Frage C1",
+    "source_page": 9,
+    "title": "Statisch unbestimmtes Tragwerk mit Kraft am Punkt B",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "E",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 0.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "E",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "D",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "pin"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "B",
+        "fx": "F",
+        "fy": "F",
+        "label": "√(2F) at 45°"
+      }
+    ],
+    "notes": "Zweifach abgewinkelter Balken A-B-C-D mit 45°-geneigter Kraft √(2F) am Punkt B.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2020_fraged1",
+    "source_pdf": "HS 2020.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 11,
+    "title": "Dreifach abgewinkelter Träger A-B-C-D-E mit Biegung und Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "E",
+        "x": 0.0,
+        "y": 2.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "E",
+        "fx": 0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Dreifach abgewinkelter Träger mit Biegesteifigkeit EI und Torsionssteifigkeit GIr in allen Abschnitten.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2021_frageb1",
+    "source_pdf": "FS 2021.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 7,
+    "title": "Rahmen mit Kragarm und Gleichstreckenlast",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 1.5,
+        "y": 1.0
+      },
+      {
+        "node_id": "E",
+        "x": 2.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "B",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "pin"
+      },
+      {
+        "node_id": "E",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "C",
+        "fx": 0,
+        "fy": "F",
+        "label": "F"
+      },
+      {
+        "type": "distributed",
+        "member_id": 4,
+        "q": "2F/l",
+        "direction": "global_y",
+        "label": "q"
+      }
+    ],
+    "notes": "Rahmen mit drei Balken an Punkt B verschweißt, Kragarm DE mit Gleichstreckenlast.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2021_fraged1",
+    "source_pdf": "FS 2021.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 13,
+    "title": "Zweifach abgewinkelter Träger A-B-C-D mit Kraft und Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "D",
+        "x": 2.0,
+        "y": 2.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "B",
+        "end_node": "A",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "A",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "D",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "A",
+        "fx": 0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Zweifach abgewinkelter Rahmen mit Biegung und Torsion; Kraft P in z-Richtung wirkt bei A.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2021_frageb1",
+    "source_pdf": "HS 2021.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Tragwerk mit vier Balken und Gleichstreckenlast",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 3.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "E",
+        "x": 4.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      },
+      {
+        "node_id": "E",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "distributed",
+        "member_id": 1,
+        "q": "F/l",
+        "direction": "perpendicular",
+        "label": "q=F/l"
+      }
+    ],
+    "notes": "Vier gelenkig verbundene Balken mit Gleichstreckenlast im Abschnitt A-B, statisch bestimmt.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2021_fraged1",
+    "source_pdf": "HS 2021.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 12,
+    "title": "Träger A-B-C-D-E mit Biegung und Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 2.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "E",
+        "x": 3.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "E",
+        "fx": 0.0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Dreiachsiges Tragwerk mit kombinierter Beanspruchung (Biegung und Torsion) in allen geraden Abschnitten.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2022_frageb1",
+    "source_pdf": "FS 2022.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Tragwerk A-B-C-D mit Vertikallast an C",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 3.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      },
+      {
+        "node_id": "D",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "C",
+        "fx": 0,
+        "fy": "√2F",
+        "label": "√2F"
+      }
+    ],
+    "notes": "Ebenes Tragwerk mit biegesteifer Verbindung; alle Balkenelemente haben Biegesteifigkeit EI und Dehnsteifigkeit EA.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2022_fraged1",
+    "source_pdf": "FS 2022.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 12,
+    "title": "Träger A-B-C-D mit Biegung und Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 1.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "B",
+        "end_node": "A",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "pin"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "D",
+        "fx": 0.0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Ebener Träger mit Biegung und Torsion; Kraft P wirkt in positiver globaler y-Richtung an Punkt D.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2022_frageb1",
+    "source_pdf": "HS 2022.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Verformung am statisch bestimmten Tragwerk A-B-C-D-E",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "D",
+        "x": 2.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "E",
+        "x": 1.0,
+        "y": 2.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "pin"
+      },
+      {
+        "node_id": "E",
+        "support_type": "pin"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "C",
+        "fx": "-F",
+        "fy": "0",
+        "label": "F"
+      }
+    ],
+    "notes": "Ebenes Rahmentragwerk mit horizontaler Last an Knoten C; Bestimmung von Schnittgrößen und Verformungen.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2022_frageb3",
+    "source_pdf": "HS 2022.pdf",
+    "source_task_label": "Frage B3",
+    "source_page": 7,
+    "title": "Rahmen mit Biegemomentenbeanspruchungen",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 1.0,
+        "y": 0.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "B",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "moment",
+        "node_id": "B",
+        "M": "M_B",
+        "label": "M_B"
+      },
+      {
+        "type": "moment",
+        "node_id": "C",
+        "M": "M_C",
+        "label": "M_C"
+      }
+    ],
+    "notes": "Zweigelenkiger Rahmen unter Biegemomentenbeanspruchung; Berechnung der horizontalen Verschiebung am Kraftangriffspunkt C.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2022_fraged1",
+    "source_pdf": "HS 2022.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 12,
+    "title": "Rahmen A-B-C-D mit Biegung und Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 1.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "E",
+        "x": 1.5,
+        "y": 0.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "E",
+        "fx": 0.0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Biegesteifigkeit EI und Torsionssteifigkeit GIₜ in allen Abschnitten; Aufgabe D1 fragt nach dem Torsionsmoment im Balkenabschnitt B-C.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "fs2023_fraged1",
+    "source_pdf": "FS 2023.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 12,
+    "title": "Dreifach abgewinkelter Träger A-B-C-D-E mit Biegung & Torsion",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 2.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "D",
+        "x": 3.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "E",
+        "x": 4.0,
+        "y": -1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": null
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": null
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "E",
+        "fx": 0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "In x-y-Ebene liegender Träger mit kombinierter Biegung und Torsion, Biegesteifigkeit EI und Torsionssteifigkeit GIT in allen Abschnitten.",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2023_frageb1",
+    "source_pdf": "HS 2023.pdf",
+    "source_task_label": "Frage B1",
+    "source_page": 6,
+    "title": "Tragwerk mit vier geraden Balken unter geneigter Kraft",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "D",
+        "x": 1.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "E",
+        "x": 2.0,
+        "y": 1.0
+      },
+      {
+        "node_id": "F",
+        "x": 2.0,
+        "y": 3.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "B",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 5,
+        "start_node": "E",
+        "end_node": "F",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "pin"
+      },
+      {
+        "node_id": "C",
+        "support_type": "fixed"
+      },
+      {
+        "node_id": "F",
+        "support_type": "roller_y"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "F",
+        "fx": "√(2P)",
+        "fy": "0",
+        "label": "√(2P)"
+      }
+    ],
+    "notes": "Tragwerk mit vier Balken unter um 45° geneigter Kraft mit Magnitude √(2P).",
+    "review_status": "pending",
+    "review_note": ""
+  },
+  {
+    "task_id": "hs2023_fraged1",
+    "source_pdf": "HS 2023.pdf",
+    "source_task_label": "Frage D1",
+    "source_page": 12,
+    "title": "Statisch bestimmtes Tragwerk mit kombinierter Beanspruchung",
+    "structure_type": "frame",
+    "nodes": [
+      {
+        "node_id": "A",
+        "x": 2.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "B",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "C",
+        "x": 0.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "D",
+        "x": 2.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "E",
+        "x": 3.0,
+        "y": 2.0
+      },
+      {
+        "node_id": "F",
+        "x": 3.0,
+        "y": 0.0
+      },
+      {
+        "node_id": "G",
+        "x": 1.0,
+        "y": 1.0
+      }
+    ],
+    "members": [
+      {
+        "member_id": 1,
+        "start_node": "A",
+        "end_node": "B",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 2,
+        "start_node": "B",
+        "end_node": "C",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 3,
+        "start_node": "C",
+        "end_node": "D",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 4,
+        "start_node": "D",
+        "end_node": "E",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 5,
+        "start_node": "E",
+        "end_node": "F",
+        "EI": "EI",
+        "EA": "EA"
+      },
+      {
+        "member_id": 6,
+        "start_node": "D",
+        "end_node": "G",
+        "EI": "GI_t",
+        "EA": "EA"
+      },
+      {
+        "member_id": 7,
+        "start_node": "G",
+        "end_node": "F",
+        "EI": "EI",
+        "EA": "EA"
+      }
+    ],
+    "supports": [
+      {
+        "node_id": "A",
+        "support_type": "fixed"
+      }
+    ],
+    "loads": [
+      {
+        "type": "point_force",
+        "node_id": "G",
+        "fx": 0.0,
+        "fy": "P",
+        "label": "P"
+      }
+    ],
+    "notes": "Träger A-B-C-D-E-F-G mit Biegung und Torsion; gekrümmter Abschnitt D-E-F-G mit Radius R=l.",
+    "review_status": "pending",
+    "review_note": ""
+  }
+]

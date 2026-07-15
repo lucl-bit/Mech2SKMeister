@@ -41,6 +41,10 @@ def solve_support_reactions(beam: Beam) -> SupportReactions:
         load.force_y * (load.x - support_a.x) for load in beam.point_loads
     )
 
+    for q_load in beam.distributed_loads:
+        load_force_sum += q_load.resultant
+        load_moment_about_a += q_load.resultant * (q_load.centroid - support_a.x)
+
     by = -load_moment_about_a / span
     ay = -load_force_sum - by
 

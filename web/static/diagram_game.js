@@ -32,13 +32,13 @@ class DiagramGame {
     this.gameOver = false;
     this._onClick = this._onClick.bind(this);
     this._onResize = this._onResize.bind(this);
-    canvas.addEventListener('click', this._onClick);
+    canvas.addEventListener('pointerup', this._onClick);
     window.addEventListener('resize', this._onResize);
   }
 
   destroy() {
     this._clearTimer();
-    this.canvas.removeEventListener('click', this._onClick);
+    this.canvas.removeEventListener('pointerup', this._onClick);
     window.removeEventListener('resize', this._onResize);
   }
 
@@ -74,7 +74,11 @@ class DiagramGame {
     const resp = await fetch('/api/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ convention_id: 'uni', challenge_number: chNum }),
+      body: JSON.stringify({
+        convention_id: 'uni',
+        challenge_number: chNum,
+        seed: Math.floor(Math.random() * 1e9),
+      }),
     });
     this.challenge = await resp.json();
     this.selectedId = null;
@@ -335,6 +339,10 @@ class DiagramGame {
       case 'moment_peak_right_negative': line(left, center, loadAt, bottom, right, center); badge(loadAt, bottom-14, '−'); break;
       case 'moment_cantilever_positive': line(left, top, loadAt, center, right, center); badge((left+loadAt)/2, top+14, '+'); break;
       case 'moment_cantilever_negative': line(left, bottom, loadAt, center, right, center); badge((left+loadAt)/2, bottom-14, '−'); break;
+      case 'shear_linear_pos_to_neg': line(left, top, right, bottom); badge(left + (right-left)*0.25, top+14, '+'); badge(left + (right-left)*0.75, bottom-14, '−'); break;
+      case 'shear_linear_neg_to_pos': line(left, bottom, right, top); badge(left + (right-left)*0.25, bottom-14, '−'); badge(left + (right-left)*0.75, top+14, '+'); break;
+      case 'moment_parabola_positive': this._drawParabola(ctx, left, right, center, top); badge(halfAt, top+14, '+'); break;
+      case 'moment_parabola_negative': this._drawParabola(ctx, left, right, center, bottom); badge(halfAt, bottom-14, '−'); break;
     }
   }
 
@@ -493,6 +501,11 @@ class DiagramGame {
       ctx.fillText('freies Ende', end + 50, y + 38); ctx.textAlign = 'left';
     }
 
+    const distributed = beam.distributed_loads || [];
+    for (const q of distributed) {
+      this._drawBeamDistributedLoad(sx(q.x_start), sx(q.x_end), y, q.q);
+    }
+
     for (const load of beam.point_loads) {
       const lx = sx(load.x);
       const fy = load.force_y, fx = load.force_x || 0;
@@ -510,6 +523,22 @@ class DiagramGame {
         ctx.fillText(`${Math.abs(fx)} kN`, lx + (dir > 0 ? -80 : 14), y - 10);
       }
     }
+  }
+
+  _drawBeamDistributedLoad(x1, x2, y, qValue) {
+    const ctx = this.ctx;
+    const top = y - 56;
+    ctx.strokeStyle = C.load; ctx.fillStyle = C.load; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1, top); ctx.lineTo(x2, top); ctx.stroke();
+    const span = x2 - x1;
+    const n = Math.max(4, Math.min(10, Math.round(span / 36)));
+    for (let i = 0; i <= n; i++) {
+      const x = x1 + (span * i) / n;
+      this._arrowLine(x, top, x, y - 8);
+    }
+    ctx.font = 'bold 12px Helvetica'; ctx.textAlign = 'center';
+    ctx.fillText('q = ' + Math.abs(qValue) + ' kN/m', (x1 + x2) / 2, top - 6);
+    ctx.textAlign = 'left';
   }
 
   _drawBeamSupport(x, y, type, label) {
@@ -777,7 +806,40 @@ class DiagramGame {
       case 'triangle_positive':
         line(left, center, right, top, right, center);
         this._signBadge((left + right) / 2, top + 16, '+', color); break;
+
+      case 'shear_linear_pos_to_neg':
+        line(left, top, right, bottom);
+        this._signBadge(left + (right - left) * 0.25, top + 16, '+', color);
+        this._signBadge(left + (right - left) * 0.75, bottom - 16, '-', color); break;
+
+      case 'shear_linear_neg_to_pos':
+        line(left, bottom, right, top);
+        this._signBadge(left + (right - left) * 0.25, bottom - 16, '-', color);
+        this._signBadge(left + (right - left) * 0.75, top + 16, '+', color); break;
+
+      case 'moment_parabola_positive':
+        this._drawParabola(ctx, left, right, center, top);
+        this._signBadge(halfAt, top + 16, '+', color); break;
+
+      case 'moment_parabola_negative':
+        this._drawParabola(ctx, left, right, center, bottom);
+        this._signBadge(halfAt, bottom - 16, '-', color); break;
     }
+  }
+
+  _drawParabola(ctx, left, right, center, peakY) {
+    const steps = 24;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;            // 0..1
+      const x = left + (right - left) * t;
+      // Parabolic shape: y = peak * 4 t (1 - t); zero at ends, max at midspan.
+      const peakOffset = peakY - center;
+      const y = center + 4 * t * (1 - t) * peakOffset;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
 
   _drawLineSystemOption(shape, x, y, w, h, system) {

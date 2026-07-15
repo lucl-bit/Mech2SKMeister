@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
+
+import numpy as np
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -87,6 +90,201 @@ def solve_truss_route():
         return jsonify({"ok": False, "error": str(exc)})
 
 
+def _solve_frame_builder(joints, bars, supports_list, loads, welds_set, distributed_loads=None):
+    """
+    Solves a 2D frame (beam-column elements) with support for internal hinges
+    via per-element rotation DOFs at non-welded nodes.
+
+    joints: list of {joint_id, x, y}
+    bars:   list of {bar_id, start_id, end_id}
+    supports_list: list of {joint_id, support_type}  type in 'pin'|'roller'|'fixed'
+    loads:  list of {joint_id, fx, fy}
+    welds_set: set of joint_ids that are rigidly welded (shared rotation)
+
+    Returns (bar_forces_dict, reactions_dict)
+      bar_forces_dict: {bar_id: {N_start, Q_start, M_start, N_end, Q_end, M_end}}
+      reactions_dict:  {rx:<id>|ry:<id>|mz:<id>: value}
+    """
+    EA, EI = 1000.0, 1.0
+
+    jmap   = {j["joint_id"]: j for j in joints}
+    jids   = [j["joint_id"] for j in joints]
+    jidx   = {jid: i for i, jid in enumerate(jids)}
+    n_j    = len(jids)
+
+    # Count bars per joint to detect internal hinges
+    bars_at = defaultdict(list)
+    for b in bars:
+        bars_at[b["start_id"]].append(b["bar_id"])
+        bars_at[b["end_id"]].append(b["bar_id"])
+
+    # Translation DOFs: 2 per joint
+    ux_dof = {jid: 2 * i     for i, jid in enumerate(jids)}
+    uy_dof = {jid: 2 * i + 1 for i, jid in enumerate(jids)}
+    next_dof = 2 * n_j
+
+    # Rotation DOFs:
+    #   welded joint or single-bar joint → one shared rotation DOF per joint
+    #   hinge joint (not welded, 2+ bars) → one independent rotation DOF per (bar, end)
+    jrot_dof      = {}   # joint_id → dof  (welded/single-bar joints)
+    brot_start    = {}   # bar_id   → dof  (hinge at start end)
+    brot_end      = {}   # bar_id   → dof  (hinge at end   end)
+
+    for jid in jids:
+        if jid in welds_set or len(bars_at[jid]) <= 1:
+            jrot_dof[jid] = next_dof
+            next_dof += 1
+
+    for b in bars:
+        bid = b["bar_id"]
+        if b["start_id"] not in jrot_dof:
+            brot_start[bid] = next_dof; next_dof += 1
+        if b["end_id"]   not in jrot_dof:
+            brot_end[bid]   = next_dof; next_dof += 1
+
+    n_dof = next_dof
+    K = np.zeros((n_dof, n_dof))
+    F = np.zeros(n_dof)
+
+    elem_data = {}
+    for b in bars:
+        bid = b["bar_id"]
+        j1  = jmap[b["start_id"]]
+        j2  = jmap[b["end_id"]]
+        x1, y1, x2, y2 = float(j1["x"]), float(j1["y"]), float(j2["x"]), float(j2["y"])
+        dx, dy = x2 - x1, y2 - y1
+        L = (dx**2 + dy**2) ** 0.5
+        if L < 1e-9:
+            raise ValueError(f"bar {bid} has zero length")
+        cx, cy = dx / L, dy / L
+
+        T = np.array([
+            [ cx,  cy, 0,   0,   0,  0],
+            [-cy,  cx, 0,   0,   0,  0],
+            [  0,   0, 1,   0,   0,  0],
+            [  0,   0, 0,  cx,  cy,  0],
+            [  0,   0, 0, -cy,  cx,  0],
+            [  0,   0, 0,   0,   0,  1],
+        ])
+        k_loc = np.array([
+            [ EA/L,           0,           0, -EA/L,           0,           0],
+            [    0,  12*EI/L**3,  6*EI/L**2,     0, -12*EI/L**3,  6*EI/L**2],
+            [    0,   6*EI/L**2,    4*EI/L,      0,  -6*EI/L**2,    2*EI/L ],
+            [-EA/L,           0,           0,  EA/L,           0,           0],
+            [    0, -12*EI/L**3, -6*EI/L**2,     0,  12*EI/L**3, -6*EI/L**2],
+            [    0,   6*EI/L**2,    2*EI/L,      0,  -6*EI/L**2,    4*EI/L ],
+        ])
+        k_glob = T.T @ k_loc @ T
+
+        sid, eid = b["start_id"], b["end_id"]
+        th1 = jrot_dof.get(sid, brot_start.get(bid))
+        th2 = jrot_dof.get(eid, brot_end.get(bid))
+        dofs = [ux_dof[sid], uy_dof[sid], th1, ux_dof[eid], uy_dof[eid], th2]
+
+        for a, da in enumerate(dofs):
+            for bb, db in enumerate(dofs):
+                K[da, db] += k_glob[a, bb]
+
+        elem_data[bid] = (T, k_loc, L, dofs)
+
+    # Fixed-end forces for distributed loads (UDL, q positive = +local_y)
+    if distributed_loads:
+        for dl in distributed_loads:
+            bid = dl["bar_id"]
+            q = float(dl["q"])
+            T, k_loc, L, dofs = elem_data[bid]
+            fef_loc = np.array([0, q*L/2, q*L**2/12, 0, q*L/2, -q*L**2/12])
+            fef_glob = T.T @ fef_loc
+            for a, da in enumerate(dofs):
+                F[da] += fef_glob[a]
+
+    # Point loads
+    for ld in loads:
+        jid = ld["joint_id"]
+        F[ux_dof[jid]] += float(ld["fx"])
+        F[uy_dof[jid]] += float(ld["fy"])
+
+    # Boundary conditions
+    sup_map     = {s["joint_id"]: s["support_type"] for s in supports_list}
+    fixed_dofs  = set()
+    for jid, stype in sup_map.items():
+        fixed_dofs.add(ux_dof[jid]) if stype in ("pin", "fixed") else None
+        fixed_dofs.add(uy_dof[jid]) if stype in ("pin", "roller", "fixed") else None
+        if stype == "roller":
+            # roller fixes y only; also un-fix x if accidentally added
+            fixed_dofs.discard(ux_dof[jid])
+        if stype == "fixed" and jid in jrot_dof:
+            fixed_dofs.add(jrot_dof[jid])
+
+    free_dofs = [d for d in range(n_dof) if d not in fixed_dofs]
+    K_ff = K[np.ix_(free_dofs, free_dofs)]
+    F_f  = F[free_dofs]
+
+    try:
+        d_free = np.linalg.solve(K_ff, F_f)
+    except np.linalg.LinAlgError:
+        d_free = np.linalg.lstsq(K_ff, F_f, rcond=None)[0]
+
+    d = np.zeros(n_dof)
+    for k_i, dof in enumerate(free_dofs):
+        d[dof] = d_free[k_i]
+
+    # Recover internal forces (local frame)
+    bar_forces = {}
+    for b in bars:
+        bid = b["bar_id"]
+        T, k_loc, L, dofs = elem_data[bid]
+        d_loc = T @ d[dofs]
+        f_loc = k_loc @ d_loc
+
+        fef_loc = np.zeros(6)
+        if distributed_loads:
+            for dl in distributed_loads:
+                if dl["bar_id"] == bid:
+                    q = float(dl["q"])
+                    fef_loc += np.array([0, q*L/2, q*L**2/12, 0, q*L/2, -q*L**2/12])
+        f_int = f_loc - fef_loc
+
+        N_s = -f_int[0]; Q_s = -f_int[1]; M_s =  f_int[2]
+        N_e =  f_int[3]; Q_e =  f_int[4]; M_e = -f_int[5]
+
+        bar_forces[bid] = {
+            "N_start": round(float(N_s), 4), "Q_start": round(float(Q_s), 4), "M_start": round(float(M_s), 4),
+            "N_end":   round(float(N_e), 4), "Q_end":   round(float(Q_e), 4), "M_end":   round(float(M_e), 4),
+        }
+
+    # Reactions at constrained DOFs: R = (K @ d)[fixed_dof]  (F is zero at support nodes)
+    Kd = K @ d
+    reactions = {}
+    for jid, stype in sup_map.items():
+        if ux_dof[jid] in fixed_dofs:
+            reactions[f"rx:{jid}"] = round(float(Kd[ux_dof[jid]] - F[ux_dof[jid]]), 4)
+        if uy_dof[jid] in fixed_dofs:
+            reactions[f"ry:{jid}"] = round(float(Kd[uy_dof[jid]] - F[uy_dof[jid]]), 4)
+        if stype == "fixed" and jid in jrot_dof and jrot_dof[jid] in fixed_dofs:
+            th = jrot_dof[jid]
+            reactions[f"mz:{jid}"] = round(float(Kd[th] - F[th]), 4)
+
+    return bar_forces, reactions
+
+
+@app.route("/api/solve-frame", methods=["POST"])
+def solve_frame_route():
+    data     = request.get_json()
+    joints   = data["joints"]
+    bars     = data["bars"]
+    supports = data["supports"]
+    loads    = data.get("loads", [])
+    welds    = set(data.get("welds", []))
+    distributed_loads = data.get("distributed_loads", [])
+
+    try:
+        bar_forces, reactions = _solve_frame_builder(joints, bars, supports, loads, welds, distributed_loads)
+        return jsonify({"ok": True, "bar_forces": {str(k): v for k, v in bar_forces.items()}, "reactions": reactions})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)})
+
+
 @app.route("/api/save-progress", methods=["POST"])
 def save_progress():
     data = request.get_json()
@@ -123,6 +321,10 @@ def _beam_to_dict(b: Beam) -> dict:
         "title": b.title,
         "supports": [{"x": s.x, "support_type": s.support_type.value, "label": s.label} for s in b.supports],
         "point_loads": [{"x": lv.x, "force_y": lv.force_y, "force_x": getattr(lv, "force_x", 0.0), "label": lv.label} for lv in b.point_loads],
+        "distributed_loads": [
+            {"x_start": q.x_start, "x_end": q.x_end, "q": q.q, "label": q.label}
+            for q in b.distributed_loads
+        ],
     }
 
 

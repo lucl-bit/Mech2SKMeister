@@ -7,3 +7,5 @@ venv/
 .DS_Store
 *.log
 schnittkraft_trainer/data/progress/*.json
+
+.claude/worktrees/

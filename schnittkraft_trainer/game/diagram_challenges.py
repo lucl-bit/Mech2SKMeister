@@ -14,7 +14,7 @@ from schnittkraft_trainer.mechanics.truss_solver import (
     TrussModel,
     solve_truss,
 )
-from schnittkraft_trainer.model.load import PointLoad
+from schnittkraft_trainer.model.load import DistributedLoad, PointLoad
 from schnittkraft_trainer.model.structure import Beam
 from schnittkraft_trainer.model.support import Support, SupportType
 
@@ -147,10 +147,21 @@ def generate_beam_challenge(
     if system_type == "pin_roller_sym":
         system_type = "pin_roller"
 
-    length = rng.choice([4.0, 5.0, 6.0, 8.0])
-    load_positions = [length * fraction for fraction in (0.25, 0.5, 0.75)]
-    load_x = rng.choice(load_positions)
-    load_value = rng.choice([6.0, 8.0, 10.0, 12.0])
+    # Pilot: distributed-load variant only on simply-supported beams in The Basics.
+    use_distributed = (
+        system_type == "pin_roller"
+        and 1 <= level <= 10
+        and rng.random() < 0.30
+    )
+    if use_distributed:
+        return _generate_distributed_beam_challenge(convention, level, rng)
+
+    # Random length & load position (not only mid/quarter/three-quarter) for wider variety.
+    length = round(rng.uniform(4.0, 8.0) * 2) / 2  # 0.5 m steps in [4, 8]
+    load_x = round(rng.uniform(0.2 * length, 0.8 * length) * 2) / 2
+    if load_x <= 0 or load_x >= length:
+        load_x = length / 2
+    load_value = float(rng.choice([5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 14.0]))
 
     # Decide if we add a horizontal force component (for N ≠ 0)
     add_horizontal = rng.random() < 0.45
@@ -458,7 +469,78 @@ _FLIP_PAIRS: dict[str, str] = {
     "moment_cantilever_negative":   "moment_cantilever_positive",
     "n_left_positive":              "n_left_negative",
     "n_left_negative":              "n_left_positive",
+    "shear_linear_pos_to_neg":      "shear_linear_neg_to_pos",
+    "shear_linear_neg_to_pos":      "shear_linear_pos_to_neg",
+    "moment_parabola_positive":     "moment_parabola_negative",
+    "moment_parabola_negative":     "moment_parabola_positive",
 }
+
+
+def _generate_distributed_beam_challenge(
+    convention: SignConvention,
+    level: int,
+    rng: random.Random,
+) -> DiagramChallenge:
+    length = round(rng.uniform(4.0, 8.0) * 2) / 2
+    q_value = float(rng.choice([4.0, 5.0, 6.0, 8.0, 10.0]))  # kN/m, downward
+    supports = [
+        Support(x=0.0, support_type=SupportType.PIN, label="A"),
+        Support(x=length, support_type=SupportType.ROLLER, label="B"),
+    ]
+    distributed = DistributedLoad(x_start=0.0, x_end=length, q=-q_value, label="q")
+    beam = Beam(
+        length=length,
+        supports=supports,
+        point_loads=[],
+        distributed_loads=[distributed],
+        title=f"Einfeldträger mit Streckenlast q = {q_value:g} kN/m",
+    )
+
+    diagram_kind = rng.choice([DiagramKind.SHEAR, DiagramKind.MOMENT])
+
+    if diagram_kind is DiagramKind.SHEAR:
+        # Q(0) = +qL/2 (in base convention), Q(L) = -qL/2  → linear.
+        left_positive = convention.convert_shear(q_value * length / 2) > 0
+        correct_shape = "shear_linear_pos_to_neg" if left_positive else "shear_linear_neg_to_pos"
+    else:
+        # M_max = q L^2 / 8 at midspan, sagging.
+        moment_sign = 1 if convention.convert_moment(1.0) > 0 else -1
+        correct_shape = "moment_parabola_positive" if moment_sign > 0 else "moment_parabola_negative"
+
+    wrong_shapes = _wrong_shapes(correct_shape, diagram_kind, rng)
+    shapes = [correct_shape, *wrong_shapes[:2]]
+    rng.shuffle(shapes)
+
+    options = [
+        DiagramOption(
+            option_id=chr(ord("A") + index),
+            label=chr(ord("A") + index),
+            shape=shape,
+            is_correct=shape == correct_shape,
+        )
+        for index, shape in enumerate(shapes)
+    ]
+    correct_id = next(option.option_id for option in options if option.is_correct)
+
+    explanation = (
+        "Eine konstante Streckenlast erzeugt einen linearen Querkraftverlauf "
+        "(Q springt nicht, sondern fällt/steigt gleichmäßig)."
+        if diagram_kind is DiagramKind.SHEAR
+        else "Eine konstante Streckenlast erzeugt einen parabolischen Momentenverlauf "
+             "mit M_max = q·L²/8 in der Mitte des Einfeldträgers."
+    )
+
+    return DiagramChallenge(
+        title=_title_for_kind(diagram_kind),
+        level=level,
+        challenge_type="beam",
+        beam=beam,
+        diagram_kind=diagram_kind,
+        system_type="pin_roller",
+        options=options,
+        correct_option_id=correct_id,
+        explanation=explanation,
+    )
 
 
 def _correct_shape(
@@ -521,6 +603,7 @@ def _wrong_shapes(
         pool = [
             "shear_positive_then_negative", "shear_negative_then_positive",
             "shear_positive_then_zero", "shear_negative_then_zero",
+            "shear_linear_pos_to_neg", "shear_linear_neg_to_pos",
             "constant_positive", "constant_negative", "zero",
         ]
     else:
@@ -529,17 +612,28 @@ def _wrong_shapes(
             "moment_peak_left_positive", "moment_peak_left_negative",
             "moment_peak_right_positive", "moment_peak_right_negative",
             "moment_cantilever_positive", "moment_cantilever_negative",
+            "moment_parabola_positive", "moment_parabola_negative",
             "constant_positive",
         ]
 
     others = [s for s in pool if s != correct_shape and s != flipped]
-    if rng:
+    if rng is not None:
         rng.shuffle(others)
 
-    # Always include the sign-flipped answer if it exists and differs from correct
-    if flipped and flipped != correct_shape:
+    # Include the sign-flipped answer only ~50% of the time. Otherwise the
+    # answer becomes too predictable ("the right one is just the mirror of
+    # one of the wrongs"). When omitted, flipped is treated like any other
+    # pool entry.
+    force_flipped = rng is None or rng.random() < 0.5
+    if flipped and flipped != correct_shape and force_flipped:
         return [flipped, *others]
-    return others
+
+    candidates = list(others)
+    if flipped and flipped != correct_shape and not force_flipped:
+        candidates.append(flipped)
+        if rng is not None:
+            rng.shuffle(candidates)
+    return candidates
 
 
 def _title_for_kind(diagram_kind: DiagramKind) -> str:
