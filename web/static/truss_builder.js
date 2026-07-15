@@ -27,7 +27,7 @@ class TrussBuilder {
     this.activeMemberStart = null;
     this.activeLoadNodeId = null;
     this.previewLoadEnd = null;
-    this.tool = 'node';
+    this.tool = 'draw';
     this.mode = 'N';
     this.hoverNode = null;
     this.hoverPos = null;
@@ -45,13 +45,18 @@ class TrussBuilder {
     this._onRelease = this._onRelease.bind(this);
     this._onResize = this._onResize.bind(this);
     this._onKey = this._onKey.bind(this);
+    this._onContext = this._onContext.bind(this);
+    this._onDblClick = this._onDblClick.bind(this);
     canvas.addEventListener('pointerdown', this._onPress);
     canvas.addEventListener('pointermove', this._onMove);
     canvas.addEventListener('pointerup', this._onRelease);
     canvas.addEventListener('pointercancel', this._onRelease);
+    canvas.addEventListener('contextmenu', this._onContext);
+    canvas.addEventListener('dblclick', this._onDblClick);
     window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this._onKey);
     canvas.style.cursor = 'crosshair';
+    this._guide();
   }
 
   destroy() {
@@ -60,6 +65,8 @@ class TrussBuilder {
     this.canvas.removeEventListener('pointermove', this._onMove);
     this.canvas.removeEventListener('pointerup', this._onRelease);
     this.canvas.removeEventListener('pointercancel', this._onRelease);
+    this.canvas.removeEventListener('contextmenu', this._onContext);
+    this.canvas.removeEventListener('dblclick', this._onDblClick);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
   }
@@ -73,34 +80,75 @@ class TrussBuilder {
     });
   }
 
+  // Werkzeug-Definitionen: [id, Label, Kürzel, Tooltip, Icon-SVG]
+  static get TOOLS() {
+    const sw = 'stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"';
+    return [
+      ['draw',   'Zeichnen', '1', 'Stabzug zeichnen: jeder Klick setzt Knoten + Stab in einem Zug (ESC/Doppelklick beendet).',
+        `<svg viewBox="0 0 28 28"><path d="M4 22 L13 8 L24 18" ${sw}/><circle cx="4" cy="22" r="3" ${sw}/><circle cx="13" cy="8" r="3" ${sw}/><circle cx="24" cy="18" r="3" fill="currentColor" stroke="none"/></svg>`],
+      ['node',   'Knoten', '2', 'Einzelnen Knoten aufs Raster setzen.',
+        `<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="5" ${sw}/><path d="M14 3v4M14 21v4M3 14h4M21 14h4" ${sw}/></svg>`],
+      ['member', 'Stab', '3', 'Stab: zwei vorhandene Knoten nacheinander anklicken.',
+        `<svg viewBox="0 0 28 28"><path d="M6 22 L22 6" ${sw}/><circle cx="6" cy="22" r="3.5" ${sw}/><circle cx="22" cy="6" r="3.5" ${sw}/></svg>`],
+      ['pin',    'Festlager', '4', 'Festlager (blockiert x und y) auf einen Knoten setzen.',
+        `<svg viewBox="0 0 28 28"><circle cx="14" cy="6" r="2.5" ${sw}/><path d="M14 8 L7 19 H21 Z" ${sw}/><path d="M4 22 h20" ${sw}/></svg>`],
+      ['roller', 'Loslager', '5', 'Loslager (blockiert nur y) auf einen Knoten setzen.',
+        `<svg viewBox="0 0 28 28"><circle cx="14" cy="5" r="2.5" ${sw}/><path d="M14 7 L8 16 H20 Z" ${sw}/><circle cx="10" cy="19.5" r="2" ${sw}/><circle cx="18" cy="19.5" r="2" ${sw}/><path d="M5 23 h18" ${sw}/></svg>`],
+      ['fixed',  'Einspannung', '6', 'Einspannung (blockiert alles inkl. Moment) auf einen Knoten setzen.',
+        `<svg viewBox="0 0 28 28"><path d="M9 3 v22" ${sw}/><path d="M9 14 h13" ${sw}/><path d="M4 8 l5 -4 M4 14 l5 -4 M4 20 l5 -4 M4 26 l5 -4" ${sw} stroke-width="1.4"/></svg>`],
+      ['weld',   'Schweissung', '7', 'Knoten biegesteif machen (überträgt Moment). Default ist Gelenk.',
+        `<svg viewBox="0 0 28 28"><rect x="9" y="9" width="10" height="10" fill="currentColor" stroke="none"/><path d="M14 2 v5 M14 21 v5 M2 14 h5 M21 14 h5" ${sw}/></svg>`],
+      ['free',   'Freies Ende', '8', 'Knoten ausdrücklich als freies Ende markieren.',
+        `<svg viewBox="0 0 28 28"><path d="M6 20 L20 8" ${sw}/><circle cx="20" cy="8" r="3.5" ${sw}/><path d="M15 3 l10 0" ${sw} stroke-dasharray="3 2"/></svg>`],
+      ['load',   'Last', '9', 'Kraft: vom Knoten in Lastrichtung ziehen.',
+        `<svg viewBox="0 0 28 28"><path d="M14 4 v14" ${sw}/><path d="M9 15 l5 7 l5 -7" fill="currentColor" stroke="none"/></svg>`],
+      ['loadz',  'Z-Last', '0', 'Z-Last: Klick toggelt ⊗ (hinein) → ⊙ (heraus) → weg.',
+        `<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="9" ${sw}/><path d="M9 9 l10 10 M19 9 l-10 10" ${sw}/></svg>`],
+      ['distload', 'Streckenlast', 'Q', 'Streckenlast auf einen Stab (wirkt senkrecht zur Stabachse).',
+        `<svg viewBox="0 0 28 28"><path d="M4 6 h20" ${sw}/><path d="M7 6 v9 M14 6 v9 M21 6 v9" ${sw}/><path d="M5 15 l2 4 l2 -4 M12 15 l2 4 l2 -4 M19 15 l2 4 l2 -4" fill="currentColor" stroke="none"/><path d="M4 23 h20" ${sw}/></svg>`],
+      ['delete', 'Löschen', 'X', 'Knoten oder Stab entfernen. Tipp: Rechtsklick löscht immer, egal welches Werkzeug.',
+        `<svg viewBox="0 0 28 28"><path d="M7 9 h14 l-1.5 14 h-11 Z" ${sw}/><path d="M5 9 h18 M11 9 V6 h6 v3 M12 13 v6 M16 13 v6" ${sw}/></svg>`],
+    ];
+  }
+
+  static get TOOL_GROUPS() {
+    return [['Bauen', ['draw', 'node', 'member']],
+            ['Lagern', ['pin', 'roller', 'fixed', 'weld', 'free']],
+            ['Belasten', ['load', 'loadz', 'distload']],
+            ['Bearbeiten', ['delete']]];
+  }
+
   _buildToolbar() {
     const container = document.getElementById('tool-buttons');
     container.innerHTML = '';
-    const tools = [
-      ['node',   'Knoten',        'Klicke auf das Raster, um einen Knoten zu setzen.'],
-      ['member', 'Stab',          'Zwei Knoten nacheinander anklicken.'],
-      ['pin',    'Festlager',     'Auf einen Knoten klicken (▲ + Strich, blockiert x und y).'],
-      ['roller', 'Loslager',      'Auf einen Knoten klicken (▲ auf Rollen, nur y blockiert).'],
-      ['fixed',  'Einspannung',   'Auf einen Knoten klicken (Wand, blockiert alles inkl. Moment).'],
-      ['weld',   'Verschweissung','Markiert einen Knoten als biegesteif (überträgt M). Default ist Gelenk.'],
-      ['free',   'Freies Ende',   'Markiert einen Knoten ausdrücklich als frei.'],
-      ['load',   'Last ziehen',   'Vom Knoten ausgehend in Lastrichtung ziehen.'],
-      ['loadz',    'Z-Last ⊗/⊙',    'Klick auf einen Knoten: ⊗ (hinein) → ⊙ (heraus) → entfernen.'],
-      ['distload', 'Streckenlast',  'Klick auf einen Stab: Streckenlast ↓↓↓ ein-/ausschalten.'],
-      ['delete',   'Löschen',       'Klick auf einen Knoten löscht ihn + alle anhängenden Stäbe.'],
-    ];
-    tools.forEach(([value, label, tip]) => {
-      const div = document.createElement('label');
-      div.className = 'radio-tool' + (value === this.tool ? ' active' : '');
-      div.title = tip;
-      div.innerHTML = `<input type="radio" name="tool" value="${value}" ${value === this.tool ? 'checked' : ''}> <span>${label}</span>`;
-      div.querySelector('input').addEventListener('change', () => {
-        this.setTool(value);
-        document.querySelectorAll('.radio-tool').forEach(el => el.classList.remove('active'));
-        div.classList.add('active');
-      });
-      container.appendChild(div);
-    });
+    const byId = Object.fromEntries(TrussBuilder.TOOLS.map(t => [t[0], t]));
+    this._toolTiles = {};
+    for (const [groupLabel, ids] of TrussBuilder.TOOL_GROUPS) {
+      const head = document.createElement('div');
+      head.className = 'tool-group-label';
+      head.textContent = groupLabel;
+      container.appendChild(head);
+      const grid = document.createElement('div');
+      grid.className = 'tool-grid';
+      for (const id of ids) {
+        const [value, label, key, tip, icon] = byId[id];
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tool-tile' + (value === this.tool ? ' active' : '');
+        btn.title = `${tip} [Taste ${key}]`;
+        btn.innerHTML = `${icon}<span>${label}</span><kbd>${key}</kbd>`;
+        btn.onclick = () => this.setTool(value);
+        grid.appendChild(btn);
+        this._toolTiles[value] = btn;
+      }
+      container.appendChild(grid);
+    }
+  }
+
+  _markActiveTool() {
+    for (const [id, btn] of Object.entries(this._toolTiles || {})) {
+      btn.classList.toggle('active', id === this.tool);
+    }
   }
 
   _buildHistoryControls() {
@@ -182,15 +230,35 @@ class TrussBuilder {
   }
   _onKey(e) {
     const mod = e.metaKey || e.ctrlKey;
-    if (!mod) return;
-    if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
-    else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); this.redo(); }
+    if (mod) {
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
+      else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); this.redo(); }
+      return;
+    }
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'Escape') {
+      this.activeMemberStart = null;
+      this.activeLoadNodeId = null;
+      this.previewLoadEnd = null;
+      this._guide('Aktion abgebrochen.');
+      this.requestRedraw();
+      return;
+    }
+    const keyMap = {
+      '1': 'draw', '2': 'node', '3': 'member', '4': 'pin', '5': 'roller',
+      '6': 'fixed', '7': 'weld', '8': 'free', '9': 'load', '0': 'loadz',
+      'q': 'distload', 'x': 'delete',
+    };
+    const tool = keyMap[e.key.toLowerCase()];
+    if (tool) { e.preventDefault(); this.setTool(tool); }
   }
 
   setTool(t) {
     this.tool = t;
     this.activeMemberStart = null;
+    this._markActiveTool();
     const hints = {
+      draw: 'Zeichnen: Klick setzt Knoten und verbindet sie zum Stabzug. ESC oder Doppelklick beendet den Zug.',
       node: 'Raster anklicken, um einen Knoten zu setzen.',
       member: 'Stab: erst Startknoten, dann Endknoten anklicken.',
       pin: 'Festlager: Knoten anklicken.',
@@ -199,10 +267,69 @@ class TrussBuilder {
       weld: 'Verschweissung: Knoten anklicken — toggelt zwischen Gelenk und biegesteifem Anschluss.',
       free: 'Freies Ende: Knoten anklicken.',
       load: 'Last: Vom Knoten in Lastrichtung ziehen.',
+      loadz: 'Z-Last: Knoten anklicken (⊗ → ⊙ → entfernen).',
       distload: 'Streckenlast: Stab anklicken — Streckenlast ein-/ausschalten.',
-      delete: 'Löschen: Knoten anklicken.',
+      delete: 'Löschen: Knoten oder Stab anklicken. Rechtsklick löscht in jedem Werkzeug.',
     };
     this._setStatus(hints[t] || ('Werkzeug aktiv: ' + t));
+    this.requestRedraw();
+  }
+
+  // Geführte Statuszeile: nach jeder Modelländerung den nächsten sinnvollen
+  // Schritt anzeigen und den Berechnen-Button hervorheben, wenn's passt.
+  _guide(prefix) {
+    const j = this.nodes.length, m = this.members.length;
+    const r = Object.values(this.supports).reduce((s, t) =>
+      s + (t === 'fixed' ? 3 : t === 'pin' ? 2 : 1), 0);
+    const hasLoad = Object.keys(this.loads).length + Object.keys(this.loadsZ).length
+      + Object.keys(this.distributedLoads).length > 0;
+    let msg;
+    if (j === 0) msg = 'Klick ins Raster setzt den ersten Knoten (Zeichnen-Modus verbindet gleich weiter).';
+    else if (m === 0) msg = 'Jetzt Stäbe ziehen — im Zeichnen-Modus einfach weiterklicken.';
+    else if (r < 3) msg = `Lagerung fehlt noch (aktuell ${r}/3 Wertigkeiten) — Fest-/Loslager oder Einspannung setzen.`;
+    else if (!hasLoad) msg = 'System steht — jetzt eine Last aufbringen (Werkzeug „Last": vom Knoten ziehen).';
+    else {
+      const bal = this._isFrame()
+        ? 3 * m + r - (3 * j + this._hingeCount())
+        : m + r - 2 * j;
+      if (bal === 0) msg = 'Bereit: statisch bestimmt — Berechnen drücken!';
+      else msg = bal < 0 ? 'System ist unterbestimmt (beweglich) — mehr Stäbe oder Lager nötig.'
+                         : 'System ist überbestimmt — Stab oder Lagerwertigkeit entfernen.';
+    }
+    this._setStatus(prefix ? `${prefix} — ${msg}` : msg);
+  }
+
+  // Berechnen-Button pulsiert, sobald das System statisch bestimmt + belastet
+  // ist. Läuft bei jeder Modelländerung (via _clearResults).
+  _updateSolveReady() {
+    const j = this.nodes.length, m = this.members.length;
+    const r = Object.values(this.supports).reduce((s, t) =>
+      s + (t === 'fixed' ? 3 : t === 'pin' ? 2 : 1), 0);
+    const hasLoad = Object.keys(this.loads).length + Object.keys(this.loadsZ).length
+      + Object.keys(this.distributedLoads).length > 0;
+    let ready = false;
+    if (j >= 2 && m >= 1 && r >= 3 && hasLoad) {
+      const bal = this._isFrame()
+        ? 3 * m + r - (3 * j + this._hingeCount())
+        : m + r - 2 * j;
+      ready = bal === 0;
+    }
+    const solveBtn = document.querySelector('.btn-solve');
+    if (solveBtn) solveBtn.classList.toggle('btn-solve-ready', ready);
+    return ready;
+  }
+
+  _hingeCount() {
+    const barsAtNode = {};
+    this.members.forEach(mb => {
+      barsAtNode[mb.start_id] = (barsAtNode[mb.start_id] || 0) + 1;
+      barsAtNode[mb.end_id] = (barsAtNode[mb.end_id] || 0) + 1;
+    });
+    let g = 0;
+    for (const [nid, cnt] of Object.entries(barsAtNode)) {
+      if (!this.welds.has(Number(nid)) && cnt >= 2) g += cnt - 1;
+    }
+    return g;
   }
 
   setMode(m) {
@@ -276,7 +403,8 @@ class TrussBuilder {
       return;
     }
     const x = this._snap(mx), y = this._snap(my);
-    if (this.tool === 'node')        { this._pushUndo(); this._addNode(x, y); }
+    if (this.tool === 'draw')        { this._handleDrawTool(mx, my); }
+    else if (this.tool === 'node')   { this._pushUndo(); this._addNode(x, y); }
     else if (this.tool === 'member') { this._handleMemberTool(mx, my); }
     else if (['pin','roller','fixed'].includes(this.tool)) { this._pushUndo(); this._setSupport(mx, my, this.tool); }
     else if (this.tool === 'weld')   { this._pushUndo(); this._toggleWeld(mx, my); }
@@ -312,7 +440,7 @@ class TrussBuilder {
     // Nur neu zeichnen, wenn sich sichtbar etwas ändert: Hover-Wechsel oder
     // eine aktive Vorschau (Knoten-Ghost, Stab-Linie, Last-Pfeil).
     const hasPreview =
-      this.tool === 'node' ||
+      this.tool === 'node' || this.tool === 'draw' ||
       (this.tool === 'member' && this.activeMemberStart !== null) ||
       (this.tool === 'load' && this.activeLoadNodeId !== null);
     if (hasPreview || this.hoverNode !== prevHover) this.requestRedraw();
@@ -337,6 +465,55 @@ class TrussBuilder {
     this._clearResults();
     this._setStatus(`Knoten ${this.nextNodeId} gesetzt.`);
     this.nextNodeId++;
+  }
+
+  // Smart-Zeichnen: Klick setzt Knoten (falls nötig) und verbindet ihn mit
+  // dem vorherigen — CAD-artiger Stabzug ohne Werkzeugwechsel.
+  _handleDrawTool(mx, my) {
+    this._pushUndo();
+    let node = this._pickNode(mx, my);
+    if (!node) {
+      const x = this._snap(mx), y = this._snap(my);
+      node = { node_id: this.nextNodeId++, x, y };
+      this.nodes.push(node);
+    }
+    if (this.activeMemberStart !== null && this.activeMemberStart !== node.node_id) {
+      const ids = new Set([this.activeMemberStart, node.node_id]);
+      const exists = this.members.some(m => ids.has(m.start_id) && ids.has(m.end_id));
+      if (!exists) {
+        this.members.push(this._canonicalMember(this.members.length + 1, this.activeMemberStart, node.node_id));
+      }
+    }
+    this.activeMemberStart = node.node_id;
+    this._clearResults();
+    this._guide(`Knoten ${node.node_id} (ESC beendet den Zug).`);
+  }
+
+  // Rechtsklick: kontextabhängig löschen (Knoten vor Stab), egal welches Tool.
+  _onContext(e) {
+    e.preventDefault();
+    if (this.editMode) return;
+    const [mx, my] = this._pos(e);
+    const node = this._pickNode(mx, my);
+    if (node) { this._pushUndo(); this._deleteNode(node); this.requestRedraw(); return; }
+    const bar = this._barHitTest(mx, my);
+    if (bar) {
+      this._pushUndo();
+      this.members = this.members.filter(m => m.bar_id !== bar.bar_id);
+      delete this.distributedLoads[bar.bar_id];
+      this._clearResults();
+      this._guide(`Stab ${bar.bar_id} gelöscht.`);
+      this.requestRedraw();
+    }
+  }
+
+  _onDblClick(e) {
+    e.preventDefault();
+    if (this.activeMemberStart !== null) {
+      this.activeMemberStart = null;
+      this._guide('Stabzug beendet.');
+      this.requestRedraw();
+    }
   }
 
   _handleMemberTool(mx, my) {
@@ -436,7 +613,20 @@ class TrussBuilder {
 
   _deleteNearest(mx, my) {
     const node = this._pickNode(mx, my);
-    if (!node) { this._setStatus('Kein Knoten in der Nähe.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
+    if (node) { this._deleteNode(node); return; }
+    const bar = this._barHitTest(mx, my);
+    if (bar) {
+      this.members = this.members.filter(m => m.bar_id !== bar.bar_id);
+      delete this.distributedLoads[bar.bar_id];
+      this._clearResults();
+      this._guide(`Stab ${bar.bar_id} gelöscht.`);
+      return;
+    }
+    this._setStatus('Kein Knoten oder Stab in der Nähe.');
+    this.undoStack.pop(); this._updateHistoryButtons();
+  }
+
+  _deleteNode(node) {
     const id = node.node_id;
     this.nodes = this.nodes.filter(n => n.node_id !== id);
     for (const m of this.members) {
@@ -450,7 +640,7 @@ class TrussBuilder {
     delete this.loadsZ[id];
     if (this.activeMemberStart === id) this.activeMemberStart = null;
     this._clearResults();
-    this._setStatus(`Knoten ${id} gelöscht.`);
+    this._guide(`Knoten ${id} gelöscht.`);
   }
 
   _nearestNode(x, y, maxDist = 20) {
@@ -510,7 +700,10 @@ class TrussBuilder {
     this._clearResults();
   }
 
-  _clearResults() { this.memberForces = {}; this.beamResults = {}; this.reactions = {}; }
+  _clearResults() {
+    this.memberForces = {}; this.beamResults = {}; this.reactions = {};
+    this._updateSolveReady();
+  }
 
   clear() {
     this._pushUndo();
@@ -686,14 +879,14 @@ class TrussBuilder {
       ctx.beginPath(); ctx.arc(this.hoverNode.x, this.hoverNode.y, 18, 0, Math.PI * 2); ctx.fill();
     }
     // Ghost preview for placing nodes
-    if (this.tool === 'node' && this.hoverPos) {
+    if ((this.tool === 'node' || (this.tool === 'draw' && !this.hoverNode)) && this.hoverPos) {
       const gx = this._snap(this.hoverPos[0]), gy = this._snap(this.hoverPos[1]);
       ctx.strokeStyle = 'rgba(47,111,237,0.55)'; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.arc(gx, gy, 8, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
     // Preview line for member tool
-    if (this.tool === 'member' && this.activeMemberStart !== null && this.hoverPos) {
+    if ((this.tool === 'member' || this.tool === 'draw') && this.activeMemberStart !== null && this.hoverPos) {
       const s = this._nodeById(this.activeMemberStart);
       // Vorschau snappt auf den Knoten, der beim Klick getroffen würde
       const target = (this.hoverNode && this.hoverNode.node_id !== this.activeMemberStart)
