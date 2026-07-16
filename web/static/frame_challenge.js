@@ -173,8 +173,10 @@ class FrameChallenge {
       cutBars.push({ id: bar.id, from: bar.from, to: bar.to, t });
     }
     if (!cutBars.length) return null;
-    // Verschiebung: senkrecht zur Schnittlinie, Seite +1 nach +Normale
-    const nx = -dy / len, ny = dx / len;
+    // Verschiebung: senkrecht zur Schnittlinie. sideOf(p) = sign((p-p1)×d);
+    // Punkte mit side +1 liegen auf der Seite von (dy, -dx) — die Normale
+    // muss dorthin zeigen, sonst wandern die Hälften aufeinander zu.
+    const nx = dy / len, ny = -dx / len;
     return { line, cutBars, nodeSide, nx, ny };
   }
 
@@ -196,7 +198,19 @@ class FrameChallenge {
     };
     if (!cut) { drawCutLine(); return; }
 
-    const OFF = 27; // klare, aber geometrisch noch gut lesbare Schnittfuge
+    // Grosse Schnittfuge, damit die Gegenkräfte an beiden Ufern frei sichtbar
+    // sind — nur so weit reduziert, dass kein Knoten aus dem Canvas wandert.
+    let OFF = 70;
+    const margin = 14;
+    for (const [id, [px, py]] of Object.entries(this.pixelNodes)) {
+      const s = cut.nodeSide[id];
+      const ox = cut.nx * s, oy = cut.ny * s;
+      if (ox > 1e-6) OFF = Math.min(OFF, (this._cssW - margin - px) / ox);
+      else if (ox < -1e-6) OFF = Math.min(OFF, (margin - px) / ox);
+      if (oy > 1e-6) OFF = Math.min(OFF, (this._cssH - margin - py) / oy);
+      else if (oy < -1e-6) OFF = Math.min(OFF, (margin - py) / oy);
+    }
+    OFF = Math.max(30, OFF);
     const shift = id => {
       const s = cut.nodeSide[id];
       return [cut.nx * OFF * s, cut.ny * OFF * s];
@@ -209,6 +223,23 @@ class FrameChallenge {
     const shiftedNodes = {};
     for (const id of Object.keys(this.pixelNodes)) shiftedNodes[id] = P(id);
     const cutIds = new Set(cut.cutBars.map(b => b.id));
+
+    // Schnittufer je Hälfte: Original-Schnittpunkt starr mitverschoben
+    // (nicht auf der gestreckten Verbindung interpoliert) — so ist die Fuge
+    // wirklich 2·OFF breit und die Gegenkräfte liegen frei.
+    const faces = {};
+    for (const cb of cut.cutBars) {
+      const s0 = this.pixelNodes[cb.from], e0 = this.pixelNodes[cb.to];
+      const bdx = e0[0] - s0[0], bdy = e0[1] - s0[1], bL = Math.hypot(bdx, bdy) || 1;
+      const ux = bdx / bL, uy = bdy / bL;
+      const pcx = s0[0] + bdx * cb.t, pcy = s0[1] + bdy * cb.t;
+      const shA = shift(cb.from), shB = shift(cb.to);
+      faces[cb.id] = {
+        ux, uy,
+        faceA: [pcx + shA[0] - ux * 6, pcy + shA[1] - uy * 6],
+        faceB: [pcx + shB[0] + ux * 6, pcy + shB[1] + uy * 6],
+      };
+    }
 
     // Die Eingabe-Verläufe treten zurück; System, Lager und Lasten werden danach
     // vollständig und kontrastreich als zwei echte Freikörper neu gezeichnet.
@@ -226,7 +257,24 @@ class FrameChallenge {
     this._drawSupports(shiftedNodes);
     this._drawJoints(shiftedNodes);
     this._drawMarkers(shiftedNodes);
+    // Streckenlasten auf geschnittenen Stäben an der Fuge teilen — sonst
+    // überbrücken ihre Pfeile den Spalt zwischen den beiden Freikörpern.
+    const cutT = {};
+    for (const cb of cut.cutBars) cutT[cb.id] = cb.t;
+    const savedLoads = this.fixture.loads;
+    this.fixture.loads = (savedLoads || []).filter(
+      l => !(l.kind === 'distributed' && cutT[l.bar] !== undefined));
     this._drawLoads(shiftedNodes);
+    this.fixture.loads = savedLoads;
+    for (const ld of savedLoads || []) {
+      if (ld.kind !== 'distributed' || cutT[ld.bar] === undefined) continue;
+      const bar = this.fixture.bars.find(b => b.id === ld.bar);
+      const sN = shiftedNodes[bar.from], eN = shiftedNodes[bar.to];
+      const t = cutT[ld.bar];
+      const { faceA, faceB } = faces[ld.bar];
+      this._drawDistributedLoad(sN, faceA, ld.label, t >= 0.5);
+      this._drawDistributedLoad(faceB, eN, ld.label, t < 0.5);
+    }
 
     const isFrameFix = (this.fixture.welds || []).length > 0 ||
       (this.fixture.loads || []).some(l => l.kind === 'distributed');
@@ -235,15 +283,10 @@ class FrameChallenge {
       const sN = P(cb.from), eN = P(cb.to);
       const f = (this._forces || {})[cb.id];
       const t = cb.t;
-      // Uferpunkte auf beiden Hälften (leicht vor dem Schnittpunkt)
-      const faceA = [sN[0] + (eN[0] - sN[0]) * (t - 0.06), sN[1] + (eN[1] - sN[1]) * (t - 0.06)];
-      const faceB = [sN[0] + (eN[0] - sN[0]) * (t + 0.06), sN[1] + (eN[1] - sN[1]) * (t + 0.06)];
+      const { faceA, faceB, ux, uy } = faces[cb.id];
       ctx.strokeStyle = FC.beam; ctx.lineWidth = 5;
       ctx.beginPath(); ctx.moveTo(sN[0], sN[1]); ctx.lineTo(faceA[0], faceA[1]); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(eN[0], eN[1]); ctx.lineTo(faceB[0], faceB[1]); ctx.stroke();
-
-      const dx = eN[0] - sN[0], dy = eN[1] - sN[1], L = Math.hypot(dx, dy) || 1;
-      const ux = dx / L, uy = dy / L;
       // Rote Stirnlinien machen die beiden Schnittufer auch ohne Kraftwert klar.
       ctx.strokeStyle = FC.red; ctx.lineWidth = 4;
       for (const face of [faceA, faceB]) {
@@ -284,8 +327,8 @@ class FrameChallenge {
     if (this.tutorHighlight) this._drawTutorHighlight(shiftedNodes);
     drawCutLine();
     if (line) {
-      const mx = (line.x1 + line.x2) / 2, my = (line.y1 + line.y2) / 2;
-      this._drawCanvasPill('SCHNITT A–A', mx, my - 12, FC.red, 'center');
+      // Ans Linienende, nicht in die Spaltmitte — dort liegen die Gegenkräfte.
+      this._drawCanvasPill('SCHNITT A–A', line.x1, line.y1 - 26, FC.red, 'center');
     }
 
     // Lesbare Ergebnis-Karte statt kleiner, frei schwebender Texte im System.
@@ -1012,7 +1055,7 @@ class FrameChallenge {
     ctx.setLineDash([]);
   }
 
-  _drawDistributedLoad(s, e, label) {
+  _drawDistributedLoad(s, e, label, showLabel = true) {
     const ctx = this.ctx;
     const dx = e[0] - s[0], dy = e[1] - s[1], len = Math.hypot(dx, dy);
     const nx = -dy / len, ny = dx / len;
@@ -1031,8 +1074,10 @@ class FrameChallenge {
       const qy = s[1] + (e[1] - s[1]) * t;
       this._arrow(px, py, qx - (nx * 4), qy - (ny * 4));
     }
-    ctx.fillStyle = FC.load; ctx.font = 'bold 13px Helvetica';
-    ctx.fillText(label || 'q', (s[0] + e[0]) / 2 + nx * (-off - 14), (s[1] + e[1]) / 2 + ny * (-off - 14));
+    if (showLabel) {
+      ctx.fillStyle = FC.load; ctx.font = 'bold 13px Helvetica';
+      ctx.fillText(label || 'q', (s[0] + e[0]) / 2 + nx * (-off - 14), (s[1] + e[1]) / 2 + ny * (-off - 14));
+    }
   }
 
   _drawAnswers() {
