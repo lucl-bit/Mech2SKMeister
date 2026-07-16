@@ -31,10 +31,12 @@ class FixturesApiTest(unittest.TestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self._orig_path = server.FIXTURES_PATH
         server.FIXTURES_PATH = Path(self._tmpdir.name) / "exam_fixtures.json"
+        server._AUTH_FAILS.clear()
         self.client = server.app.test_client()
 
     def tearDown(self):
         server.FIXTURES_PATH = self._orig_path
+        server._AUTH_FAILS.clear()
         self._tmpdir.cleanup()
 
     def _post_fixture(self, fixture, headers=PW_HEADER):
@@ -93,6 +95,26 @@ class FixturesApiTest(unittest.TestCase):
         self._post_fixture(VALID_FIXTURE)
         resp = self.client.delete("/api/fixtures/gibt-es-nicht", headers=PW_HEADER)
         self.assertEqual(resp.status_code, 404)
+
+    def test_corrupt_store_is_never_overwritten(self):
+        server.FIXTURES_PATH.write_text("{kaputt", encoding="utf-8")
+        get = self.client.get("/api/fixtures")
+        self.assertFalse(get.get_json()["ok"])
+        post = self._post_fixture(VALID_FIXTURE)
+        self.assertEqual(post.status_code, 500)
+        delete = self.client.delete("/api/fixtures/x", headers=PW_HEADER)
+        self.assertEqual(delete.status_code, 500)
+        # Datei-Inhalt unangetastet
+        self.assertEqual(server.FIXTURES_PATH.read_text(encoding="utf-8"), "{kaputt")
+
+    def test_auth_rate_limit(self):
+        for _ in range(server._AUTH_MAX_FAILS):
+            self.client.post("/api/fixtures/auth", json={"password": "falsch"})
+        blocked = self.client.post("/api/fixtures/auth", json={"password": "lucas1234"})
+        self.assertEqual(blocked.status_code, 429)
+        # Auch Schreib-Endpoints sind für die IP gesperrt
+        resp = self._post_fixture(VALID_FIXTURE)
+        self.assertEqual(resp.status_code, 403)
 
     def test_delete_wrong_password(self):
         self._post_fixture(VALID_FIXTURE)

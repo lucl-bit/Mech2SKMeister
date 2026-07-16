@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -33,7 +35,8 @@ from schnittkraft_trainer.model.structure import Beam
 PACKAGE_ROOT = Path(__file__).parent / "schnittkraft_trainer"
 WEB_ROOT = Path(__file__).parent / "web"
 FIXTURES_PATH = PACKAGE_ROOT / "data" / "exam_fixtures.json"
-SETTINGS_PASSWORD = "lucas1234"
+# Nur lokale Nutzung: Default per Nutzer-Vorgabe, bei Deploy via Env überschreiben.
+SETTINGS_PASSWORD = os.environ.get("SETTINGS_PASSWORD", "lucas1234")
 
 app = Flask(
     __name__,
@@ -307,12 +310,18 @@ def solve_frame_route():
 
 
 def _load_fixtures():
+    """None = kein Store (Client nutzt Fallback). ValueError = Datei existiert,
+    ist aber kaputt — Schreib-Endpoints dürfen sie dann NICHT überschreiben."""
+    if not FIXTURES_PATH.exists():
+        return None
     try:
         with FIXTURES_PATH.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
-        return data if isinstance(data, list) else None
-    except (OSError, json.JSONDecodeError):
-        return None
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"fixture store unreadable: {exc}") from exc
+    if not isinstance(data, list):
+        raise ValueError("fixture store is not a list")
+    return data
 
 
 def _save_fixtures(fixtures):
@@ -324,13 +333,40 @@ def _save_fixtures(fixtures):
     os.replace(tmp, FIXTURES_PATH)
 
 
+# Brute-Force-Bremse: max. Fehlversuche pro IP im Zeitfenster (in-memory,
+# reicht für den Ein-Prozess-Flask-Server).
+_AUTH_FAILS: dict[str, list[float]] = {}
+_AUTH_MAX_FAILS = 10
+_AUTH_WINDOW_S = 300.0
+
+
+def _auth_blocked(ip: str) -> bool:
+    now = time.monotonic()
+    fails = [t for t in _AUTH_FAILS.get(ip, []) if now - t < _AUTH_WINDOW_S]
+    _AUTH_FAILS[ip] = fails
+    return len(fails) >= _AUTH_MAX_FAILS
+
+
+def _auth_record_fail(ip: str) -> None:
+    _AUTH_FAILS.setdefault(ip, []).append(time.monotonic())
+
+
 def _check_password(req) -> bool:
-    return req.headers.get("X-Settings-Password", "") == SETTINGS_PASSWORD
+    ip = req.remote_addr or "?"
+    if _auth_blocked(ip):
+        return False
+    ok = hmac.compare_digest(req.headers.get("X-Settings-Password", ""), SETTINGS_PASSWORD)
+    if not ok:
+        _auth_record_fail(ip)
+    return ok
 
 
 @app.route("/api/fixtures", methods=["GET"])
 def list_fixtures():
-    fixtures = _load_fixtures()
+    try:
+        fixtures = _load_fixtures()
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)})
     if fixtures is None:
         return jsonify({"ok": False, "error": "no store"})
     return jsonify({"ok": True, "fixtures": fixtures})
@@ -338,8 +374,15 @@ def list_fixtures():
 
 @app.route("/api/fixtures/auth", methods=["POST"])
 def fixtures_auth():
+    ip = request.remote_addr or "?"
+    if _auth_blocked(ip):
+        return jsonify({"ok": False, "error": "too many attempts"}), 429
     data = request.get_json(silent=True) or {}
-    return jsonify({"ok": data.get("password", "") == SETTINGS_PASSWORD})
+    supplied = data.get("password", "")
+    ok = isinstance(supplied, str) and hmac.compare_digest(supplied, SETTINGS_PASSWORD)
+    if not ok:
+        _auth_record_fail(ip)
+    return jsonify({"ok": ok})
 
 
 @app.route("/api/fixtures", methods=["POST"])
@@ -358,7 +401,11 @@ def upsert_fixture():
         or not isinstance(fixture.get("loads"), list)
     ):
         return jsonify({"ok": False, "error": "invalid fixture"}), 400
-    fixtures = _load_fixtures() or []
+    try:
+        fixtures = _load_fixtures() or []
+    except ValueError as exc:
+        # Kaputten Store niemals stillschweigend überschreiben
+        return jsonify({"ok": False, "error": str(exc)}), 500
     for i, existing in enumerate(fixtures):
         if existing.get("id") == fixture["id"]:
             fixtures[i] = fixture
@@ -373,7 +420,10 @@ def upsert_fixture():
 def delete_fixture(fid):
     if not _check_password(request):
         return jsonify({"ok": False, "error": "wrong password"}), 403
-    fixtures = _load_fixtures() or []
+    try:
+        fixtures = _load_fixtures() or []
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
     remaining = [f for f in fixtures if f.get("id") != fid]
     if len(remaining) == len(fixtures):
         return jsonify({"ok": False, "error": "not found"}), 404
