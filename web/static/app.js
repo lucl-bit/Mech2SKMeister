@@ -49,8 +49,11 @@ const App = {
     const wrap   = document.getElementById('builder-canvas-wrap');
     this.trussBuilder = new TrussBuilder(canvas, wrap);
     const fromSettings = !!(opts && opts.fromSettings);
+    this._builderFromSettings = fromSettings;
     const saveBtn = document.getElementById('btn-save-fixture');
     if (saveBtn) saveBtn.style.display = fromSettings ? '' : 'none';
+    const backBtn = document.getElementById('builder-back');
+    if (backBtn) backBtn.textContent = fromSettings ? '← Datenbank' : '← Menü';
     if (fixture) {
       this.trussBuilder.editContext = {
         fixtureId: fixture.id,
@@ -74,6 +77,13 @@ const App = {
     this.inertiaLab = new window.InertiaLab(canvas, wrap, level || 'mid');
     // Resize warten, bis Layout steht
     requestAnimationFrame(() => this.inertiaLab.start());
+  },
+
+  // Zurück aus dem Builder: in die Datenbank-Liste, wenn er von dort
+  // geöffnet wurde, sonst ins Hauptmenü.
+  builderBack() {
+    if (this._builderFromSettings) this.showSettings();
+    else this.showMenu();
   },
 
   showSettings() {

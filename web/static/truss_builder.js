@@ -31,6 +31,8 @@ class TrussBuilder {
     this.mode = 'N';
     this.hoverNode = null;
     this.hoverPos = null;
+    this._movingNodeId = null;
+    this._movingMoved = false;
 
     this.undoStack = [];
     this.redoStack = [];
@@ -106,7 +108,9 @@ class TrussBuilder {
         `<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="9" ${sw}/><path d="M9 9 l10 10 M19 9 l-10 10" ${sw}/></svg>`],
       ['distload', 'Streckenlast', 'Q', 'Streckenlast auf einen Stab (wirkt senkrecht zur Stabachse).',
         `<svg viewBox="0 0 28 28"><path d="M4 6 h20" ${sw}/><path d="M7 6 v9 M14 6 v9 M21 6 v9" ${sw}/><path d="M5 15 l2 4 l2 -4 M12 15 l2 4 l2 -4 M19 15 l2 4 l2 -4" fill="currentColor" stroke="none"/><path d="M4 23 h20" ${sw}/></svg>`],
-      ['delete', 'Löschen', 'X', 'Knoten oder Stab entfernen. Tipp: Rechtsklick löscht immer, egal welches Werkzeug.',
+      ['move',   'Verschieben', 'V', 'Knoten mit gedrückter Maustaste verschieben — Lager und Lasten wandern mit.',
+        `<svg viewBox="0 0 28 28"><path d="M14 4 v20 M4 14 h20" ${sw}/><path d="M14 2 l-3.5 4.5 h7 Z M14 26 l-3.5 -4.5 h7 Z M2 14 l4.5 -3.5 v7 Z M26 14 l-4.5 -3.5 v7 Z" fill="currentColor" stroke="none"/></svg>`],
+      ['delete', 'Löschen', 'X', 'Knoten, Stab oder Last entfernen. Tipp: Rechtsklick löscht immer, egal welches Werkzeug.',
         `<svg viewBox="0 0 28 28"><path d="M7 9 h14 l-1.5 14 h-11 Z" ${sw}/><path d="M5 9 h18 M11 9 V6 h6 v3 M12 13 v6 M16 13 v6" ${sw}/></svg>`],
     ];
   }
@@ -115,7 +119,7 @@ class TrussBuilder {
     return [['Bauen', ['draw', 'node', 'member']],
             ['Lagern', ['pin', 'roller', 'fixed', 'weld', 'free']],
             ['Belasten', ['load', 'loadz', 'distload']],
-            ['Bearbeiten', ['delete']]];
+            ['Bearbeiten', ['move', 'delete']]];
   }
 
   _buildToolbar() {
@@ -237,6 +241,14 @@ class TrussBuilder {
     }
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.key === 'Escape') {
+      if (this._movingNodeId !== null && this._movingNodeId !== undefined) {
+        // Drag abbrechen: Undo-Snapshot vom Drag-Start wiederherstellen
+        this._movingNodeId = null;
+        this._movingMoved = false;
+        this.canvas.style.cursor = 'grab';
+        this.undo();
+        return;
+      }
       this.activeMemberStart = null;
       this.activeLoadNodeId = null;
       this.previewLoadEnd = null;
@@ -247,7 +259,7 @@ class TrussBuilder {
     const keyMap = {
       '1': 'draw', '2': 'node', '3': 'member', '4': 'pin', '5': 'roller',
       '6': 'fixed', '7': 'weld', '8': 'free', '9': 'load', '0': 'loadz',
-      'q': 'distload', 'x': 'delete',
+      'q': 'distload', 'v': 'move', 'x': 'delete',
     };
     const tool = keyMap[e.key.toLowerCase()];
     if (tool) { e.preventDefault(); this.setTool(tool); }
@@ -269,9 +281,11 @@ class TrussBuilder {
       load: 'Last: Vom Knoten in Lastrichtung ziehen.',
       loadz: 'Z-Last: Knoten anklicken (⊗ → ⊙ → entfernen).',
       distload: 'Streckenlast: Stab anklicken — Streckenlast ein-/ausschalten.',
-      delete: 'Löschen: Knoten oder Stab anklicken. Rechtsklick löscht in jedem Werkzeug.',
+      move: 'Verschieben: Knoten anfassen und ziehen — Lager und Lasten wandern mit.',
+      delete: 'Löschen: Knoten, Stab oder Last anklicken. Rechtsklick löscht in jedem Werkzeug. Doppelklick auf einen Kraftpfeil ändert die Werte.',
     };
     this._setStatus(hints[t] || ('Werkzeug aktiv: ' + t));
+    this.canvas.style.cursor = t === 'move' ? 'grab' : 'crosshair';
     this.requestRedraw();
   }
 
@@ -412,6 +426,7 @@ class TrussBuilder {
     else if (this.tool === 'load')   { this._pushUndo(); this._startLoad(mx, my); }
     else if (this.tool === 'loadz')    { this._pushUndo(); this._toggleZLoad(mx, my); }
     else if (this.tool === 'distload') { this._pushUndo(); this._toggleDistLoad(mx, my); }
+    else if (this.tool === 'move')     { this._startMove(mx, my); }
     else if (this.tool === 'delete')   { this._pushUndo(); this._deleteNearest(mx, my); }
     if (this.tool !== 'load') this.requestRedraw();
   }
@@ -428,6 +443,18 @@ class TrussBuilder {
         this.manualSolution[bar_id][this.mode][which] = level;
       } else {
         this.canvas.style.cursor = this._editHitTest(mx, my) ? 'grab' : 'default';
+      }
+      this.requestRedraw(); return;
+    }
+    if (this._movingNodeId !== null && this._movingNodeId !== undefined) {
+      const n = this._nodeById(this._movingNodeId);
+      if (n) {
+        const nx = this._snap(mx), ny = this._snap(my);
+        if (nx !== n.x || ny !== n.y) {
+          n.x = nx; n.y = ny;
+          this._movingMoved = true;
+          this._clearResults();
+        }
       }
       this.requestRedraw(); return;
     }
@@ -449,6 +476,18 @@ class TrussBuilder {
   _onRelease(e) {
     if (this.editMode) {
       if (this.editDragging) { this.editDragging = null; this.canvas.style.cursor = 'grab'; this.requestRedraw(); }
+      return;
+    }
+    if (this._movingNodeId !== null && this._movingNodeId !== undefined) {
+      const id = this._movingNodeId;
+      this._movingNodeId = null;
+      this.canvas.style.cursor = 'grab';
+      if (this._movingMoved) {
+        this._guide(`Knoten ${id} verschoben.`);
+      } else {
+        this.undoStack.pop(); this._updateHistoryButtons();
+      }
+      this.requestRedraw();
       return;
     }
     if (this.tool !== 'load' || this.activeLoadNodeId === null) return;
@@ -489,26 +528,41 @@ class TrussBuilder {
     this._guide(`Knoten ${node.node_id} (ESC beendet den Zug).`);
   }
 
-  // Rechtsklick: kontextabhängig löschen (Knoten vor Stab), egal welches Tool.
+  // Rechtsklick: kontextabhängig löschen (Knoten/Last/Stab), egal welches Tool.
   _onContext(e) {
     e.preventDefault();
     if (this.editMode) return;
     const [mx, my] = this._pos(e);
-    const node = this._pickNode(mx, my);
-    if (node) { this._pushUndo(); this._deleteNode(node); this.requestRedraw(); return; }
-    const bar = this._barHitTest(mx, my);
-    if (bar) {
+    const target = this._deleteTargetAt(mx, my);
+    if (target) {
       this._pushUndo();
-      this.members = this.members.filter(m => m.bar_id !== bar.bar_id);
-      delete this.distributedLoads[bar.bar_id];
-      this._clearResults();
-      this._guide(`Stab ${bar.bar_id} gelöscht.`);
+      this._deleteTarget(target);
       this.requestRedraw();
     }
   }
 
   _onDblClick(e) {
     e.preventDefault();
+    if (this.editMode) return;
+    // Doppelklick auf einen Kraftpfeil: Werte direkt editieren
+    const [mx, my] = this._pos(e);
+    const hit = this._loadHitTest(mx, my);
+    if (hit && hit.kind === 'load') {
+      const l = this.loads[hit.node_id];
+      const input = prompt(`Kraft an Knoten ${hit.node_id} — fx, fy in kN:`, `${l.fx}, ${l.fy}`);
+      if (input === null) return;
+      const parts = input.split(/[,;]/).map(s => parseFloat(s.trim()));
+      if (parts.length !== 2 || parts.some(v => !isFinite(v)) || (parts[0] === 0 && parts[1] === 0)) {
+        this._setStatus('Ungültige Eingabe — erwartet z.B. "-1, 1" (nicht 0, 0).');
+        return;
+      }
+      this._pushUndo();
+      this.loads[hit.node_id] = { node_id: hit.node_id, fx: parts[0], fy: parts[1] };
+      this._clearResults();
+      this._setStatus(`Last an Knoten ${hit.node_id}: Fx=${parts[0]} kN, Fy=${parts[1]} kN.`);
+      this.requestRedraw();
+      return;
+    }
     if (this.activeMemberStart !== null) {
       this.activeMemberStart = null;
       this._guide('Stabzug beendet.');
@@ -571,6 +625,16 @@ class TrussBuilder {
     this._setStatus(`Knoten ${node.node_id} ist jetzt ein freies Ende.`);
   }
 
+  _startMove(mx, my) {
+    const node = this._pickNode(mx, my);
+    if (!node) { this._setStatus('Verschieben: einen Knoten anfassen.'); return; }
+    this._pushUndo();
+    this._movingNodeId = node.node_id;
+    this._movingMoved = false;
+    this.canvas.style.cursor = 'grabbing';
+    this._setStatus(`Knoten ${node.node_id} ziehen — loslassen zum Ablegen, ESC bricht ab.`);
+  }
+
   _startLoad(mx, my) {
     const node = this._pickNode(mx, my);
     if (!node) { this._setStatus('Last muss an einem vorhandenen Knoten starten.'); this.undoStack.pop(); this._updateHistoryButtons(); return; }
@@ -611,18 +675,69 @@ class TrussBuilder {
     this._clearResults();
   }
 
-  _deleteNearest(mx, my) {
+  // Trifft der Klick eine Punktlast (Pfeil/Spitze) oder Z-Last (Kreis)?
+  _loadHitTest(mx, my) {
+    for (const l of Object.values(this.loads)) {
+      const n = this._nodeById(l.node_id);
+      if (!n) continue;
+      const [ex, ey] = this._loadArrowEnd(n.x, n.y, l.fx, l.fy);
+      const dx = ex - n.x, dy = ey - n.y, L2 = dx * dx + dy * dy;
+      const t = Math.max(0, Math.min(1, ((mx - n.x) * dx + (my - n.y) * dy) / (L2 || 1)));
+      const dSeg = Math.hypot(mx - (n.x + t * dx), my - (n.y + t * dy));
+      const dTip = Math.hypot(mx - ex, my - ey);
+      if (dSeg <= 12 || dTip <= 22) return { kind: 'load', node_id: l.node_id };
+    }
+    for (const lz of Object.values(this.loadsZ)) {
+      const n = this._nodeById(lz.node_id);
+      if (!n) continue;
+      const [ax, ay] = this._awayVec(lz.node_id) || [0.7, -0.7];
+      if (Math.hypot(mx - (n.x + ax * 30), my - (n.y + ay * 30)) <= 16) {
+        return { kind: 'loadz', node_id: lz.node_id };
+      }
+    }
+    return null;
+  }
+
+  // Löschziel mit Priorität bestimmen: direkter Knotentreffer gewinnt, danach
+  // Lasten (Pfeile setzen am Knoten an und lägen sonst immer im Knotenradius),
+  // dann Knoten mit voller Toleranz, zuletzt Stäbe.
+  _deleteTargetAt(mx, my) {
     const node = this._pickNode(mx, my);
-    if (node) { this._deleteNode(node); return; }
+    if (node && Math.hypot(node.x - mx, node.y - my) <= 10) return { kind: 'node', node };
+    const loadHit = this._loadHitTest(mx, my);
+    if (loadHit) return loadHit;
+    if (node) return { kind: 'node', node };
     const bar = this._barHitTest(mx, my);
-    if (bar) {
-      this.members = this.members.filter(m => m.bar_id !== bar.bar_id);
-      delete this.distributedLoads[bar.bar_id];
+    if (bar) return { kind: 'bar', bar };
+    return null;
+  }
+
+  // Führt das Löschen eines _deleteTargetAt-Treffers aus (delete-Tool und
+  // Rechtsklick teilen sich diese Logik).
+  _deleteTarget(target) {
+    if (target.kind === 'node') { this._deleteNode(target.node); return; }
+    if (target.kind === 'load') {
+      delete this.loads[target.node_id];
       this._clearResults();
-      this._guide(`Stab ${bar.bar_id} gelöscht.`);
+      this._guide(`Last an Knoten ${target.node_id} entfernt.`);
       return;
     }
-    this._setStatus('Kein Knoten oder Stab in der Nähe.');
+    if (target.kind === 'loadz') {
+      delete this.loadsZ[target.node_id];
+      this._clearResults();
+      this._guide(`Z-Last an Knoten ${target.node_id} entfernt.`);
+      return;
+    }
+    this.members = this.members.filter(m => m.bar_id !== target.bar.bar_id);
+    delete this.distributedLoads[target.bar.bar_id];
+    this._clearResults();
+    this._guide(`Stab ${target.bar.bar_id} gelöscht.`);
+  }
+
+  _deleteNearest(mx, my) {
+    const target = this._deleteTargetAt(mx, my);
+    if (target) { this._deleteTarget(target); return; }
+    this._setStatus('Kein Knoten, Stab oder Last in der Nähe.');
     this.undoStack.pop(); this._updateHistoryButtons();
   }
 
@@ -1152,10 +1267,19 @@ class TrussBuilder {
     ctx.fillText('frei', x + ax * 30, y + ay * 30 + 3); ctx.textAlign = 'left';
   }
 
+  // Anzeige-Endpunkt eines Kraftpfeils: Richtung aus (fx, fy), Länge mit
+  // Mindestmaß — normierte Kräfte (Betrag ~1) wären sonst unsichtbar klein.
+  // Zeichnung und Hit-Test benutzen dieselbe Geometrie.
+  _loadArrowEnd(x, y, fx, fy) {
+    const scale = this.SNAP / 5.0;
+    const mag = Math.hypot(fx, fy) || 1;
+    const len = Math.max(mag * scale, 1.5 * this.SNAP);
+    return [x + (fx / mag) * len, y + (fy / mag) * len];
+  }
+
   _drawLoad(x, y, fx, fy) {
     const ctx = this.ctx;
-    const scale = this.SNAP / 5.0;
-    const ex = x + fx * scale, ey = y + fy * scale;
+    const [ex, ey] = this._loadArrowEnd(x, y, fx, fy);
     ctx.strokeStyle = TB.load; ctx.fillStyle = TB.load; ctx.lineWidth = 3;
     this._arrow(x, y, ex, ey);
     // Label hinter der Pfeilspitze in Pfeilrichtung — überdeckt nie den Schaft,
