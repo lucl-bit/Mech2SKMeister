@@ -32,6 +32,8 @@ class FrameChallenge {
     this.cutLine = null;
     this.cutDragging = false;
     this._forces = null;
+    this.showReactions = false;
+    this.tutorHighlight = null;
 
     this._onDown = this._onDown.bind(this);
     this._onMove = this._onMove.bind(this);
@@ -179,19 +181,22 @@ class FrameChallenge {
   _drawCutOverlay() {
     const ctx = this.ctx;
     const cut = this.cut;
-    // Live-Vorschau der Linie beim Ziehen
     const line = this.cutDragging ? this.cutLine : (cut && cut.line);
-    if (line) {
-      ctx.strokeStyle = FC.red; ctx.lineWidth = 2; ctx.setLineDash([8, 5]);
+    const drawCutLine = () => {
+      if (!line) return;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(217,83,79,.18)'; ctx.lineWidth = 12; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+      ctx.strokeStyle = FC.red; ctx.lineWidth = 2.5; ctx.setLineDash([9, 6]);
       ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
       ctx.setLineDash([]);
-      // Scherensymbol am Linienanfang
-      ctx.font = '16px Helvetica'; ctx.fillStyle = FC.red;
-      ctx.fillText('✂', line.x1 - 8, line.y1 - 6);
-    }
-    if (!cut) return;
+      ctx.font = '19px Helvetica'; ctx.fillStyle = FC.red;
+      ctx.fillText('✂', line.x1 - 10, line.y1 - 9);
+      ctx.restore();
+    };
+    if (!cut) { drawCutLine(); return; }
 
-    const OFF = 16; // Auseinanderschieben der Hälften
+    const OFF = 27; // klare, aber geometrisch noch gut lesbare Schnittfuge
     const shift = id => {
       const s = cut.nodeSide[id];
       return [cut.nx * OFF * s, cut.ny * OFF * s];
@@ -201,34 +206,31 @@ class FrameChallenge {
       const [ox, oy] = shift(id);
       return [px + ox, py + oy];
     };
+    const shiftedNodes = {};
+    for (const id of Object.keys(this.pixelNodes)) shiftedNodes[id] = P(id);
     const cutIds = new Set(cut.cutBars.map(b => b.id));
 
-    // Struktur der beiden Hälften über das normale Bild legen (abdunkeln)
+    // Die Eingabe-Verläufe treten zurück; System, Lager und Lasten werden danach
+    // vollständig und kontrastreich als zwei echte Freikörper neu gezeichnet.
     ctx.save();
-    ctx.fillStyle = 'rgba(251,253,255,0.82)';
+    ctx.fillStyle = 'rgba(251,253,255,0.91)';
     ctx.fillRect(0, 0, this._cssW, this._cssH);
     ctx.restore();
 
-    // Nicht geschnittene Stäbe verschoben zeichnen
     ctx.strokeStyle = FC.beam; ctx.lineWidth = 5;
     for (const bar of this.fixture.bars) {
       if (cutIds.has(bar.id)) continue;
       const s = P(bar.from), e = P(bar.to);
       ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
     }
-    // Lager + Lasten mitverschieben wäre komplex — Knotenmarker reichen hier
-    for (const [id] of Object.entries(this.pixelNodes)) {
-      const [px, py] = P(id);
-      ctx.fillStyle = FC.paper; ctx.strokeStyle = FC.beam; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = FC.text; ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
-      ctx.fillText(id, px, py - 10); ctx.textAlign = 'left';
-    }
+    this._drawSupports(shiftedNodes);
+    this._drawJoints(shiftedNodes);
+    this._drawMarkers(shiftedNodes);
+    this._drawLoads(shiftedNodes);
 
-    // Geschnittene Stäbe: zwei Stummel + N-Pfeile an beiden Ufern
     const isFrameFix = (this.fixture.welds || []).length > 0 ||
       (this.fixture.loads || []).some(l => l.kind === 'distributed');
-    let infoY = 96;
+    const infoRows = [];
     for (const cb of cut.cutBars) {
       const sN = P(cb.from), eN = P(cb.to);
       const f = (this._forces || {})[cb.id];
@@ -240,37 +242,78 @@ class FrameChallenge {
       ctx.beginPath(); ctx.moveTo(sN[0], sN[1]); ctx.lineTo(faceA[0], faceA[1]); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(eN[0], eN[1]); ctx.lineTo(faceB[0], faceB[1]); ctx.stroke();
 
-      if (!f) continue;
-      const Nval = f.N_start + (f.N_end - f.N_start) * t;
       const dx = eN[0] - sN[0], dy = eN[1] - sN[1], L = Math.hypot(dx, dy) || 1;
       const ux = dx / L, uy = dy / L;
+      // Rote Stirnlinien machen die beiden Schnittufer auch ohne Kraftwert klar.
+      ctx.strokeStyle = FC.red; ctx.lineWidth = 4;
+      for (const face of [faceA, faceB]) {
+        ctx.beginPath();
+        ctx.moveTo(face[0] - uy * 10, face[1] + ux * 10);
+        ctx.lineTo(face[0] + uy * 10, face[1] - ux * 10);
+        ctx.stroke();
+      }
+
+      if (!f) {
+        infoRows.push({ id: cb.id, text: 'Kraftwerte werden berechnet …', color: FC.muted });
+        continue;
+      }
+      const Nval = f.N_start + (f.N_end - f.N_start) * t;
       const sgn = Math.abs(Nval) < 1e-6 ? 0 : Math.sign(Nval);
       const color = sgn > 0 ? FC.green : sgn < 0 ? FC.orange : FC.muted;
       ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5;
-      const alen = 26;
+      ctx.shadowColor = 'rgba(255,255,255,.95)'; ctx.shadowBlur = 4;
+      const alen = 34;
       if (sgn !== 0) {
-        // Zug: Pfeile zeigen vom Ufer weg entlang der Stabachse (auseinander);
-        // Druck: aufeinander zu — actio = reactio an beiden Ufern sichtbar.
         DrawUtils._arrowOn(ctx, faceA[0], faceA[1], faceA[0] + ux * alen * sgn, faceA[1] + uy * alen * sgn);
         DrawUtils._arrowOn(ctx, faceB[0], faceB[1], faceB[0] - ux * alen * sgn, faceB[1] - uy * alen * sgn);
       }
-      ctx.font = 'bold 11px Helvetica'; ctx.textAlign = 'center';
-      const label = sgn === 0 ? `${cb.id}: Nullstab` :
-        `${cb.id}: N = ${Nval > 0 ? '+' : ''}${(+Nval.toFixed(2))} (${sgn > 0 ? 'Zug' : 'Druck'})`;
-      ctx.fillText(label, (faceA[0] + faceB[0]) / 2 - (-uy) * 30, (faceA[1] + faceB[1]) / 2 - ux * 30);
-      ctx.textAlign = 'left';
+      ctx.shadowBlur = 0;
 
-      // Rahmen: zusätzlich Q/M am Schnittpunkt (M in Kurs-Konvention)
+      let text = sgn === 0 ? 'N = 0.00 kN · Nullstab' :
+        `N = ${Nval > 0 ? '+' : ''}${Nval.toFixed(2)} kN · ${sgn > 0 ? 'Zug' : 'Druck'}`;
+
       if (isFrameFix) {
         const Qval = f.Q_start + (f.Q_end - f.Q_start) * t;
         const Mval = -(f.M_start + (f.M_end - f.M_start) * t);
-        ctx.fillStyle = FC.text; ctx.font = '11px Helvetica';
-        ctx.fillText(`Stab ${cb.id} am Schnitt:  N=${Nval.toFixed(2)}  Q=${Qval.toFixed(2)}  M≈${Mval.toFixed(2)} (Kurs-Konvention)`, 42, infoY);
-        infoY += 16;
+        text += `   Q = ${Qval.toFixed(2)}   M ≈ ${Mval.toFixed(2)}`;
       }
+      infoRows.push({ id: cb.id, text, color });
     }
-    ctx.fillStyle = FC.muted; ctx.font = 'bold 11px Helvetica';
-    ctx.fillText('Ritter-Schnitt: an jedem Ufer wirkt die gleiche Stabkraft entgegengesetzt (actio = reactio).', 42, this._cssH - 20);
+
+    if (this.showReactions) this._drawReactionForces(shiftedNodes);
+    if (this.tutorHighlight) this._drawTutorHighlight(shiftedNodes);
+    drawCutLine();
+    if (line) {
+      const mx = (line.x1 + line.x2) / 2, my = (line.y1 + line.y2) / 2;
+      this._drawCanvasPill('SCHNITT A–A', mx, my - 12, FC.red, 'center');
+    }
+
+    // Lesbare Ergebnis-Karte statt kleiner, frei schwebender Texte im System.
+    const cardW = Math.min(360, this._cssW - 48);
+    const cardX = this._cssW >= 820 ? this._cssW - cardW - 28 : 24;
+    const cardY = 88;
+    const rowH = 27;
+    const cardH = 64 + Math.max(1, infoRows.length) * rowH + 30;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.97)'; ctx.strokeStyle = FC.red; ctx.lineWidth = 1.8;
+    ctx.shadowColor = 'rgba(22,34,47,.16)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, 9); else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = FC.red; ctx.font = 'bold 12px Helvetica';
+    ctx.fillText(`✂ FREIKÖRPER · ${cut.cutBars.length} ST${cut.cutBars.length === 1 ? 'AB' : 'ÄBE'} GESCHNITTEN`, cardX + 14, cardY + 22);
+    ctx.fillStyle = FC.muted; ctx.font = '11px Helvetica';
+    ctx.fillText(cut.cutBars.length <= 3 ? 'Gegenkräfte an beiden Schnittufern' : 'Hinweis: Ritter-Schnitt idealerweise durch max. 3 Stäbe', cardX + 14, cardY + 42);
+    const rows = infoRows.length ? infoRows : [{ id: '–', text: 'Noch keinen Kraftwert verfügbar', color: FC.muted }];
+    rows.forEach((row, i) => {
+      const y = cardY + 66 + i * rowH;
+      ctx.fillStyle = row.color; ctx.beginPath(); ctx.arc(cardX + 18, y - 4, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = FC.text; ctx.font = 'bold 11px Helvetica'; ctx.fillText(`Stab ${row.id}`, cardX + 30, y);
+      ctx.fillStyle = row.color; ctx.font = '11px Helvetica'; ctx.fillText(row.text, cardX + 85, y);
+    });
+    ctx.fillStyle = FC.muted; ctx.font = '10px Helvetica';
+    ctx.fillText('actio = reactio · gleiche Kraft, entgegengesetzte Richtung', cardX + 14, cardY + cardH - 13);
+    ctx.restore();
   }
 
   async loadChallenge() {
@@ -294,7 +337,7 @@ class FrameChallenge {
       } catch (e) { /* Fallback auf Prüfungsaufgaben */ }
     }
     if (!this.fixture) {
-      const fixes = window.FRAME_FIXTURES;
+      const fixes = await this._getFixtures();
       if (!this._queue || this._queue.length === 0) {
         this._queue = [...fixes].sort(() => Math.random() - 0.5);
       }
@@ -321,6 +364,8 @@ class FrameChallenge {
     this.showSolution = false;
     this._computedSolution = null;
     this._forces = null;
+    this.showReactions = false;
+    this.tutorHighlight = null;
     if (this.cutMode) this.toggleCutMode();
     this.cut = null;
     const paraHint = (this.fixture.parabolicBars?.[this.kind] || []).length
@@ -331,6 +376,22 @@ class FrameChallenge {
     this.draw();
     await this._computeSolution();
     this.draw();
+  }
+
+  // Fixtures vom Server (editierbare Datenbank); Fallback auf die statische
+  // frame_fixtures.js. Cache in window.__remoteFixtures — das Settings-Tab
+  // setzt ihn nach Speichern/Löschen auf null.
+  async _getFixtures() {
+    if (!window.__remoteFixtures) {
+      try {
+        const data = await (await fetch('/api/fixtures')).json();
+        if (data.ok && Array.isArray(data.fixtures) && data.fixtures.length) {
+          window.__remoteFixtures = data.fixtures;
+        }
+      } catch (e) { /* Server-Store fehlt — statischer Fallback */ }
+      if (!window.__remoteFixtures) window.__remoteFixtures = window.FRAME_FIXTURES;
+    }
+    return window.__remoteFixtures;
   }
 
   // Stäbe kanonisch orientieren (lokal-x mit +globaler x-Komponente, vertikal
@@ -364,7 +425,11 @@ class FrameChallenge {
 
   async _computeSolution() {
     const fix = this.fixture;
-    const isFrame = fix.welds && fix.welds.length > 0;
+    // A fixed end transfers moments even if every internal connection is a
+    // hinge.  Such systems must use the frame solver, not the ideal-truss
+    // solver (BP 2018S / 2021W are examples).
+    const isFrame = (fix.welds && fix.welds.length > 0) ||
+      Object.values(fix.supports || {}).includes('fixed');
     const distLoads = (fix.loads || []).filter(l => l.kind === 'distributed');
     const hasDistributed = distLoads.length > 0;
 
@@ -380,6 +445,8 @@ class FrameChallenge {
     for (const ld of (fix.loads || [])) {
       if (ld.kind === 'point') {
         loads.push({ joint_id: ld.node, fx: Number(ld.fx) || 0, fy: Number(ld.fy) || 0 });
+      } else if (ld.kind === 'moment') {
+        loads.push({ joint_id: ld.node, fx: 0, fy: 0, mz: Number(ld.mz) || 0 });
       } else if (ld.kind === 'z') {
         const sign = ld.direction === 'into' ? 1 : -1;
         loads.push({ joint_id: ld.node, fx: 0, fy: sign * (Number(ld.fz) || 1) });
@@ -595,7 +662,10 @@ class FrameChallenge {
   _layout() {
     const w = this._cssW, h = this._cssH;
     const bb = this.fixture.bbox;
-    const marginL = 100, marginR = 60, marginT = 80, marginB = 80;
+    // Keep the structure clear of the two-line header.  Point-load arrows
+    // extend about 60 px beyond a node and support symbols about 45 px; the
+    // old 80 px top margin clipped loads on the upper nodes of exam figures.
+    const marginL = 105, marginR = 75, marginT = 140, marginB = 95;
     const availW = w - marginL - marginR;
     const availH = h - marginT - marginB;
     const sx = availW / bb.w, sy = availH / bb.h;
@@ -735,10 +805,16 @@ class FrameChallenge {
     this._drawSupports();
     this._drawBars();
     this._drawJoints();
-    this._drawLoads();
+    this._drawMarkers();
     this._drawAnswers();
     if (this.showSolution) this._drawSolutionGhost();
     this._drawHandles();
+    // Lasten zuletzt: Kraftpfeile dürfen nie hinter Stäben oder Verläufen verschwinden.
+    this._drawLoads();
+    if (!(this.cutMode && this.cut)) {
+      if (this.showReactions) this._drawReactionForces();
+      if (this.tutorHighlight) this._drawTutorHighlight();
+    }
     if (this.cutMode) this._drawCutOverlay();
   }
 
@@ -797,22 +873,22 @@ class FrameChallenge {
   }
 
   // Nachbarknoten-Pixelpositionen für Orientierungslogik (DrawUtils).
-  _neighborsOf(id) {
+  _neighborsOf(id, nodes = this.pixelNodes) {
     const out = [];
     for (const bar of this.fixture.bars || []) {
       let other = null;
       if (bar.from === id) other = bar.to;
       else if (bar.to === id) other = bar.from;
-      if (other && this.pixelNodes[other]) out.push(this.pixelNodes[other]);
+      if (other && nodes[other]) out.push(nodes[other]);
     }
     return out;
   }
 
-  _drawJoints() {
+  _drawJoints(nodes = this.pixelNodes) {
     const ctx = this.ctx;
     const welds = new Set(this.fixture.welds || []);
     const supported = new Set(Object.keys(this.fixture.supports || {}));
-    for (const [id, [px, py]] of Object.entries(this.pixelNodes)) {
+    for (const [id, [px, py]] of Object.entries(nodes)) {
       // Skip joint marker on supported nodes: the support symbol IS the connection
       if (!supported.has(id)) {
         if (welds.has(id)) {
@@ -824,7 +900,7 @@ class FrameChallenge {
         }
       }
       // Label auf der stabfreien Seite, damit kein Stab es überdeckt
-      const [ox, oy] = DrawUtils.labelOffset(px, py, this._neighborsOf(id), supported.has(id), 18);
+      const [ox, oy] = DrawUtils.labelOffset(px, py, this._neighborsOf(id, nodes), supported.has(id), 18);
       ctx.fillStyle = FC.text; ctx.font = 'bold 12px Helvetica'; ctx.textAlign = 'center';
       ctx.fillText(id, px + ox, py + oy); ctx.textAlign = 'left';
     }
@@ -832,42 +908,80 @@ class FrameChallenge {
 
   // Lagersymbole physikalisch korrekt (Logik in DrawUtils):
   // pin/roller nur Boden/Decke, Einspannung rechtwinklig zum Stab.
-  _drawSupports() {
+  _drawSupports(nodes = this.pixelNodes) {
     const ctx = this.ctx;
     for (const [id, type] of Object.entries(this.fixture.supports || {})) {
-      const [x, y] = this.pixelNodes[id];
-      const nb = this._neighborsOf(id);
+      const [x, y] = nodes[id];
+      const nb = this._neighborsOf(id, nodes);
       if (type === 'fixed') {
         DrawUtils.drawFixed(ctx, x, y, DrawUtils.fixedAngle(x, y, nb),
           { stroke: FC.beam, lineWidth: 4, scale: 0.95 });
       } else {
-        const side = DrawUtils.supportSide(x, y, nb);
         const opts = { stroke: FC.beam, fill: '#F0F4FA', scale: 0.9 };
-        if (type === 'roller') DrawUtils.drawRoller(ctx, x, y, side, opts);
-        else DrawUtils.drawPin(ctx, x, y, side, opts);
+        if (type === 'pin_wall' || type === 'roller_x') {
+          // Horizontal reaction: rollers bear against a vertical wall.  Put
+          // the wall on the side opposite the connected structure.
+          const away = DrawUtils.awayVec(x, y, nb) || [-1, 0];
+          opts.angle = away[0] < 0 ? Math.PI / 2 : -Math.PI / 2;
+          if (type === 'pin_wall') DrawUtils.drawPin(ctx, x, y, 1, opts);
+          else DrawUtils.drawRoller(ctx, x, y, 1, opts);
+        } else {
+          const side = DrawUtils.supportSide(x, y, nb);
+          if (type === 'roller' || type === 'roller_y') DrawUtils.drawRoller(ctx, x, y, side, opts);
+          else DrawUtils.drawPin(ctx, x, y, side, opts);
+        }
       }
     }
   }
 
-  _drawLoads() {
+  // Named reference points that lie inside a continuous member (for example
+  // point E at midspan in BP 2021W).  They are labels, not artificial joints.
+  _drawMarkers(nodes = this.pixelNodes) {
+    const ctx = this.ctx;
+    for (const marker of (this.fixture.markers || [])) {
+      const bar = this.fixture.bars.find(item => item.id === marker.bar);
+      if (!bar) continue;
+      const s = nodes[bar.from], e = nodes[bar.to];
+      const t = Number(marker.t ?? 0.5);
+      const x = s[0] + (e[0] - s[0]) * t, y = s[1] + (e[1] - s[1]) * t;
+      const dx = e[0] - s[0], dy = e[1] - s[1], len = Math.hypot(dx, dy) || 1;
+      const side = Number(marker.side || 1);
+      const nx = -dy / len * side, ny = dx / len * side;
+      ctx.fillStyle = FC.text; ctx.font = 'bold 12px Helvetica'; ctx.textAlign = 'center';
+      ctx.fillText(marker.id, x + nx * 19, y + ny * 19 + 4);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  _drawLoads(nodes = this.pixelNodes) {
     const ctx = this.ctx;
     for (const load of this.fixture.loads) {
       if (load.kind === 'point') {
-        const [x, y] = this.pixelNodes[load.node];
+        const [x, y] = nodes[load.node];
         const dx = load.fx || 0, dy = load.fy || 0;
         const len = Math.hypot(dx, dy);
         const ux = dx / len, uy = dy / len;
         const sx = x - ux * 56, sy = y - uy * 56;
-        ctx.strokeStyle = FC.load; ctx.fillStyle = FC.load; ctx.lineWidth = 3;
+        // Heller Halo trennt den Pfeil auch dann vom System, wenn beides kollinear ist.
+        ctx.strokeStyle = FC.paper; ctx.fillStyle = FC.paper; ctx.lineWidth = 7;
+        this._arrow(sx, sy, x - ux * 10, y - uy * 10);
+        ctx.strokeStyle = FC.load; ctx.fillStyle = FC.load; ctx.lineWidth = 3.5;
         this._arrow(sx, sy, x - ux * 10, y - uy * 10);
         ctx.font = 'bold 13px Helvetica';
         ctx.fillText(load.label || 'F', sx + (ux > 0 ? -36 : 8), sy + (uy > 0 ? -8 : 14));
+      } else if (load.kind === 'moment') {
+        const [x, y] = nodes[load.node];
+        const clockwise = Number(load.mz) > 0;
+        ctx.strokeStyle = FC.load; ctx.fillStyle = FC.load; ctx.lineWidth = 3;
+        DrawUtils._momentArc(ctx, x, y, 30, clockwise);
+        ctx.font = 'bold 13px Helvetica';
+        ctx.fillText(load.label || 'M', x - 43, y - 31);
       } else if (load.kind === 'z') {
-        const [x, y] = this.pixelNodes[load.node];
+        const [x, y] = nodes[load.node];
         this._drawOutOfPlaneLoad(x, y, load.label, load.direction);
       } else if (load.kind === 'distributed') {
         const bar = this.fixture.bars.find(b => b.id === load.bar);
-        const s = this.pixelNodes[bar.from], e = this.pixelNodes[bar.to];
+        const s = nodes[bar.from], e = nodes[bar.to];
         this._drawDistributedLoad(s, e, load.label);
       }
     }
@@ -1070,6 +1184,86 @@ class FrameChallenge {
         }
       }
     }
+  }
+
+  _drawReactionForces(nodes = this.pixelNodes) {
+    const reactions = this._reactions || {};
+    const entries = Object.entries(reactions).filter(([, value]) => Math.abs(Number(value) || 0) > 1e-6);
+    if (!entries.length) return;
+    const ctx = this.ctx;
+    const color = FC.blue;
+    for (const [key, raw] of entries) {
+      const [axis, id] = key.split(':');
+      const p = nodes[id];
+      if (!p) continue;
+      const value = Number(raw) || 0;
+      if (axis === 'mz') {
+        const glyph = value > 0 ? '↻' : '↺';
+        ctx.fillStyle = FC.paper; ctx.strokeStyle = FC.paper; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(p[0], p[1], 31, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = color; ctx.font = 'bold 27px Helvetica'; ctx.textAlign = 'center';
+        ctx.fillText(glyph, p[0] + 34, p[1] - 17);
+        this._drawCanvasPill(`M${id} = ${Math.abs(value).toFixed(2)} kN·m`, p[0] + 47, p[1] - 51, color);
+        ctx.textAlign = 'left';
+        continue;
+      }
+      const ux = axis === 'rx' ? Math.sign(value) : 0;
+      const uy = axis === 'ry' ? Math.sign(value) : 0;
+      const start = [p[0] + ux * 12, p[1] + uy * 12];
+      const end = [p[0] + ux * 58, p[1] + uy * 58];
+      ctx.strokeStyle = FC.paper; ctx.fillStyle = FC.paper; ctx.lineWidth = 8;
+      this._arrow(start[0], start[1], end[0], end[1]);
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3.5;
+      this._arrow(start[0], start[1], end[0], end[1]);
+      const name = axis === 'rx' ? `H${id}` : `V${id}`;
+      const lx = end[0] + (ux < 0 ? -8 : ux > 0 ? 8 : 10);
+      const ly = end[1] + (uy < 0 ? -15 : uy > 0 ? 22 : -9);
+      this._drawCanvasPill(`${name} = ${Math.abs(value).toFixed(2)} kN`, lx, ly, color, ux < 0 ? 'right' : 'left');
+    }
+    this._drawCanvasPill('AUFLAGERKRÄFTE', this._cssW - 34, 92, color, 'right');
+  }
+
+  _drawTutorHighlight(nodes = this.pixelNodes) {
+    const hi = this.tutorHighlight;
+    if (!hi) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = FC.purple;
+    ctx.shadowColor = 'rgba(124,92,224,.45)';
+    ctx.shadowBlur = 12;
+    for (const barId of (hi.bars || [])) {
+      const bar = this.fixture.bars.find(b => b.id === barId);
+      if (!bar || !nodes[bar.from] || !nodes[bar.to]) continue;
+      const s = nodes[bar.from], e = nodes[bar.to];
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
+    }
+    for (const id of (hi.nodes || [])) {
+      const p = nodes[id];
+      if (!p) continue;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(p[0], p[1], 22, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+    if (hi.label) this._drawCanvasPill(hi.label, this._cssW - 34, 122, FC.purple, 'right');
+  }
+
+  _drawCanvasPill(text, x, y, color, align = 'left') {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = 'bold 11px Helvetica';
+    const padX = 8, h = 22, w = ctx.measureText(text).width + padX * 2;
+    const left = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x;
+    ctx.fillStyle = FC.paper;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(left, y - h + 5, w, h, 5);
+    else ctx.rect(left, y - h + 5, w, h);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.textAlign = 'left';
+    ctx.fillText(text, left + padX, y - 2);
+    ctx.restore();
   }
 
   _arrow(x1, y1, x2, y2) {

@@ -5,8 +5,8 @@
 //
 // Physik-Prinzip der Lagersymbole: Die Orientierung zeigt die
 // Reaktionsrichtung des Solvers, nicht die "freie Seite" der Struktur.
-//   - pin/roller: Solver fixiert y (roller) bzw. x+y (pin) → Symbol steht
-//     nur auf dem Boden oder hängt an der Decke, nie seitlich.
+//   - pin: Solver fixiert x+y; roller_y fixiert y (Boden/Decke), roller_x
+//     fixiert x (seitliche Wand).
 //   - fixed: Einspannung nimmt alles auf → Wand rechtwinklig zum
 //     austretenden Stab (exakt bei einem Stab, sonst Mittelrichtung).
 window.DrawUtils = {
@@ -38,6 +38,7 @@ window.DrawUtils = {
     const s = opts.scale || 1;
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(opts.angle || 0);
     ctx.scale(1, side);
     ctx.strokeStyle = stroke; ctx.fillStyle = fill; ctx.lineWidth = opts.lineWidth || 2;
     ctx.beginPath();
@@ -60,6 +61,7 @@ window.DrawUtils = {
     const s = opts.scale || 1;
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(opts.angle || 0);
     ctx.scale(1, side);
     ctx.strokeStyle = stroke; ctx.fillStyle = fill; ctx.lineWidth = opts.lineWidth || 2;
     ctx.beginPath();

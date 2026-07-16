@@ -712,7 +712,123 @@ class TrussBuilder {
     this.memberForces = {}; this.beamResults = {}; this.reactions = {};
     this.nextNodeId = 1; this.activeMemberStart = null;
     this.activeLoadNodeId = null; this.previewLoadEnd = null;
+    this._labelByNodeId = null; this._importUnit = null; this._passthrough = null;
     this._setStatus('Leere Zeichenfläche.'); this.requestRedraw();
+  }
+
+  // Lädt ein Fixture (Format frame_fixtures.js, y-down in Grid-Einheiten)
+  // in den Builder — Umkehrung von serializeFixture.
+  loadFixture(fixture) {
+    this._pushUndo();
+    const U = 4 * this.SNAP; // 1 Grid-Einheit = Major-Grid (4 Snap-Zellen)
+    this._importUnit = 4;
+
+    const labels = Object.keys(fixture.nodes);
+    const xs = labels.map(l => fixture.nodes[l].x);
+    const ys = labels.map(l => fixture.nodes[l].y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const w = this._cssW || this.canvas.width, h = this._cssH || this.canvas.height;
+    const ox = this._snap(Math.max(this.SNAP * 2, (w - (maxX - minX) * U) / 2));
+    const oy = this._snap(Math.max(this.SNAP * 2, (h - (maxY - minY) * U) / 2));
+
+    const idByLabel = {};
+    this._labelByNodeId = {};
+    this.nodes = labels.map((label, i) => {
+      const id = i + 1;
+      idByLabel[label] = id;
+      this._labelByNodeId[id] = label;
+      return {
+        node_id: id,
+        x: ox + (fixture.nodes[label].x - minX) * U,
+        y: oy + (fixture.nodes[label].y - minY) * U,
+      };
+    });
+    this.nextNodeId = labels.length + 1;
+
+    const memberIdByBar = {};
+    this.members = (fixture.bars || []).map((b, i) => {
+      memberIdByBar[b.id] = i + 1;
+      return { bar_id: i + 1, start_id: idByLabel[b.from], end_id: idByLabel[b.to] };
+    });
+
+    this.supports = {};
+    for (const [label, type] of Object.entries(fixture.supports || {})) {
+      this.supports[idByLabel[label]] = type;
+    }
+    this.welds = new Set((fixture.welds || []).map(l => idByLabel[l]).filter(Boolean));
+    this.freeEnds = new Set((fixture.freeEnds || []).map(l => idByLabel[l]).filter(Boolean));
+
+    this.loads = {}; this.loadsZ = {}; this.distributedLoads = {};
+    this._passthrough = { loads: [] };
+    let skipped = 0;
+    for (const l of (fixture.loads || [])) {
+      if (l.kind === 'point' && idByLabel[l.node] !== undefined) {
+        const id = idByLabel[l.node];
+        this.loads[id] = { node_id: id, fx: l.fx || 0, fy: l.fy || 0 };
+      } else if (l.kind === 'z' && idByLabel[l.node] !== undefined) {
+        const id = idByLabel[l.node];
+        this.loadsZ[id] = { node_id: id, fz: l.fz || 1, direction: l.direction || 'into' };
+      } else if (l.kind === 'distributed' && memberIdByBar[l.bar] !== undefined) {
+        const bid = memberIdByBar[l.bar];
+        this.distributedLoads[bid] = { bar_id: bid, q: l.q || 1 };
+      } else {
+        this._passthrough.loads.push(l);
+        skipped++;
+      }
+    }
+    if (fixture.markers) this._passthrough.markers = fixture.markers;
+
+    this.memberForces = {}; this.beamResults = {}; this.reactions = {};
+    this.manualSolution = {};
+    this.activeMemberStart = null; this.activeLoadNodeId = null; this.previewLoadEnd = null;
+    const hint = skipped
+      ? ` ${skipped} Last(en) (z.B. Momente) sind hier nicht editierbar, bleiben beim Speichern aber erhalten.`
+      : '';
+    this._setStatus(`"${fixture.title || fixture.id}" geladen.${hint}`);
+    this.requestRedraw();
+  }
+
+  // Speichert den aktuellen Zustand als Fixture in die Server-Datenbank
+  // (Einstellungen-Tab). Passwort kommt aus der Settings-Session.
+  async saveToServer() {
+    if (!this.nodes.length || !this.members.length) {
+      this._setStatus('Nichts zu speichern — erst ein System bauen.');
+      return;
+    }
+    const ctx0 = this.editContext || {};
+    const title = prompt('Titel der Aufgabe:', ctx0.title || '');
+    if (title === null) return; // Abbrechen
+    const source = prompt('Quelle (z.B. "Basisprüfung FS 2022 · Teil C"):', ctx0.source || '');
+    if (source === null) return;
+    const description = prompt('Beschreibung (optional):', ctx0.description || '');
+    if (description === null) return;
+
+    const fixture = this.serializeFixture({
+      id: ctx0.fixtureId,
+      title: title || 'Eigenes Fachwerk',
+      source, description,
+    });
+    try {
+      const resp = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Settings-Password': sessionStorage.getItem('mech2.settingsPw') || '',
+        },
+        body: JSON.stringify({ fixture }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        this._setStatus(`Speichern fehlgeschlagen: ${data.error || resp.status}`);
+        return;
+      }
+      window.__remoteFixtures = null; // Spiel-Cache invalidieren
+      this._setStatus(`"${fixture.title}" gespeichert.`);
+      if (window.App && typeof App.showSettings === 'function') App.showSettings();
+    } catch (e) {
+      this._setStatus('Speichern fehlgeschlagen: Server nicht erreichbar.');
+    }
   }
 
   loadExample() {
@@ -1010,8 +1126,15 @@ class TrussBuilder {
         { stroke: TB.blue, lineWidth: 5, scale: 1.15 });
       return;
     }
+    if (type === 'roller_x') {
+      // Blockiert nur x → Symbol liegt horizontal (auf der stabfreien Seite).
+      const away = DrawUtils.awayVec(x, y, nb);
+      const angle = (away && away[0] < -0.3) ? Math.PI / 2 : -Math.PI / 2;
+      DrawUtils.drawRoller(ctx, x, y, 1, { ...opts, angle });
+      return;
+    }
     const side = DrawUtils.supportSide(x, y, nb);
-    if (type === 'roller') DrawUtils.drawRoller(ctx, x, y, side, opts);
+    if (type === 'roller' || type === 'roller_y') DrawUtils.drawRoller(ctx, x, y, side, opts);
     else DrawUtils.drawPin(ctx, x, y, side, opts);
   }
 
@@ -1342,29 +1465,31 @@ class TrussBuilder {
     URL.revokeObjectURL(url);
   }
 
-  exportToCollection() {
+  // Serialisiert den aktuellen Builder-Zustand ins Fixture-Format von
+  // frame_fixtures.js (y-down, Grid-Einheiten). meta kann id/title/source/
+  // description vorgeben (beim Bearbeiten eines bestehenden Fixtures).
+  serializeFixture(meta = {}) {
     const hasTruss  = Object.keys(this.memberForces).length > 0;
     const hasBeam   = Object.keys(this.beamResults).length > 0;
     const hasManual = Object.keys(this.manualSolution).length > 0;
-    if (!hasTruss && !hasBeam && !hasManual) {
-      alert('Bitte erst "Berechnen" klicken oder Beanspruchung manuell einzeichnen!');
-      return;
-    }
 
     const SNAP = this.SNAP;
+    const unit = this._importUnit || 1;
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-    // Knoten sortiert nach node_id → Labels A, B, C, ...
+    // Knoten sortiert nach node_id → Labels A, B, C, ... — beim Bearbeiten
+    // eines geladenen Fixtures bleiben die Original-Labels stabil.
     const sortedNodes = [...this.nodes].sort((a, b) => a.node_id - b.node_id);
     const nodeLabels = {};
-    sortedNodes.forEach((n, i) => { nodeLabels[n.node_id] = letters[i] || `N${i}`; });
+    sortedNodes.forEach((n, i) => {
+      nodeLabels[n.node_id] = (this._labelByNodeId && this._labelByNodeId[n.node_id]) || letters[i] || `N${i}`;
+    });
 
-    // Koordinaten in Grid-Einheiten, y-Achse flippen
-    const canvasYs = sortedNodes.map(n => n.y);
-    const maxCanvasY = Math.max(...canvasYs);
+    // Koordinaten in Grid-Einheiten. Fixture-Konvention ist y-down wie der
+    // Canvas — KEIN Flip (sonst wären fy-Lasten und Geometrie inkonsistent).
     const rawCoords = {};
     sortedNodes.forEach(n => {
-      rawCoords[n.node_id] = { x: n.x / SNAP, y: (maxCanvasY - n.y) / SNAP };
+      rawCoords[n.node_id] = { x: n.x / (SNAP * unit), y: n.y / (SNAP * unit) };
     });
     const minX = Math.min(...Object.values(rawCoords).map(c => c.x));
     const minY = Math.min(...Object.values(rawCoords).map(c => c.y));
@@ -1378,12 +1503,18 @@ class TrussBuilder {
       };
     });
 
-    // Bars
-    const bars = this.members.map(m => ({
-      id: nodeLabels[m.start_id] + nodeLabels[m.end_id],
-      from: nodeLabels[m.start_id],
-      to: nodeLabels[m.end_id],
-    }));
+    // Bars — Stäbe mit Streckenlast bekommen das distributed-Flag
+    const barIdByMember = {};
+    const bars = this.members.map(m => {
+      const id = nodeLabels[m.start_id] + nodeLabels[m.end_id];
+      barIdByMember[m.bar_id] = id;
+      return {
+        id,
+        from: nodeLabels[m.start_id],
+        to: nodeLabels[m.end_id],
+        ...(this.distributedLoads[m.bar_id] ? { distributed: true } : {}),
+      };
+    });
 
     // Supports
     const supports = {};
@@ -1412,6 +1543,16 @@ class TrussBuilder {
         label: 'P',
       });
     }
+    const parabolicM = [];
+    for (const dl of Object.values(this.distributedLoads)) {
+      const barId = barIdByMember[dl.bar_id];
+      if (!barId) continue;
+      loads.push({ kind: 'distributed', bar: barId, q: dl.q, label: 'q' });
+      parabolicM.push(barId);
+    }
+    // Vom Builder nicht editierbare Lasten (z.B. Momentlasten) unverändert
+    // aus dem geladenen Fixture übernehmen.
+    for (const l of (this._passthrough?.loads || [])) loads.push(l);
 
     // Solutions
     const ss = this._fixtureSignStr.bind(this);
@@ -1457,14 +1598,11 @@ class TrussBuilder {
       h: Math.max(...ys) + 2,
     };
 
-    const title = prompt('Titel der Aufgabe (z.B. "Dachfachwerk HS 2022"):') ?? '';
-    if (title === null) return; // Abbrechen
-    const source = prompt('Quelle (z.B. "Prüfung HS 2022, Aufgabe 3"):') ?? '';
-
-    const fixture = {
-      id: `custom_${Date.now()}`,
-      title: title || 'Eigenes Fachwerk',
-      source: source || undefined,
+    return {
+      id: meta.id || `custom_${Date.now()}`,
+      title: meta.title || 'Eigenes Fachwerk',
+      ...(meta.description ? { description: meta.description } : {}),
+      ...(meta.source ? { source: meta.source } : {}),
       bbox,
       nodes,
       bars,
@@ -1472,8 +1610,27 @@ class TrussBuilder {
       ...(welds.length > 0 ? { welds } : {}),
       ...(freeEnds.length > 0 ? { freeEnds } : {}),
       loads,
-      solutions: { N: N_sol, Q: Q_sol, M: M_sol },
+      ...(parabolicM.length > 0 ? { parabolicBars: { M: parabolicM } } : {}),
+      ...(this._passthrough?.markers ? { markers: this._passthrough.markers } : {}),
+      // Lösungen nur mitgeben, wenn tatsächlich gerechnet/gezeichnet wurde —
+      // das Spiel rechnet sonst serverseitig selbst.
+      ...(hasTruss || hasBeam || hasManual ? { solutions: { N: N_sol, Q: Q_sol, M: M_sol } } : {}),
     };
+  }
+
+  exportToCollection() {
+    const hasResults = Object.keys(this.memberForces).length > 0
+      || Object.keys(this.beamResults).length > 0
+      || Object.keys(this.manualSolution).length > 0;
+    if (!hasResults) {
+      alert('Bitte erst "Berechnen" klicken oder Beanspruchung manuell einzeichnen!');
+      return;
+    }
+    const title = prompt('Titel der Aufgabe (z.B. "Dachfachwerk HS 2022"):');
+    if (title === null) return; // Abbrechen
+    const source = prompt('Quelle (z.B. "Prüfung HS 2022, Aufgabe 3"):') ?? '';
+
+    const fixture = this.serializeFixture({ title, source });
 
     const col = JSON.parse(localStorage.getItem('examCollection') || '[]');
     col.push(fixture);

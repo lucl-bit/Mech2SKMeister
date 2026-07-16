@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -31,6 +32,8 @@ from schnittkraft_trainer.model.structure import Beam
 
 PACKAGE_ROOT = Path(__file__).parent / "schnittkraft_trainer"
 WEB_ROOT = Path(__file__).parent / "web"
+FIXTURES_PATH = PACKAGE_ROOT / "data" / "exam_fixtures.json"
+SETTINGS_PASSWORD = "lucas1234"
 
 app = Flask(
     __name__,
@@ -109,7 +112,8 @@ def _solve_frame_builder(joints, bars, supports_list, loads, welds_set, distribu
 
     joints: list of {joint_id, x, y}
     bars:   list of {bar_id, start_id, end_id}
-    supports_list: list of {joint_id, support_type}  type in 'pin'|'roller'|'fixed'
+    supports_list: list of {joint_id, support_type}; roller/roller_y constrains
+    global y, roller_x constrains global x.
     loads:  list of {joint_id, fx, fy}
     welds_set: set of joint_ids that are rigidly welded (shared rotation)
 
@@ -215,16 +219,21 @@ def _solve_frame_builder(joints, bars, supports_list, loads, welds_set, distribu
         jid = ld["joint_id"]
         F[ux_dof[jid]] += float(ld["fx"])
         F[uy_dof[jid]] += float(ld["fy"])
+        mz = float(ld.get("mz", 0.0))
+        if abs(mz) > 0:
+            rotation_dof = jrot_dof.get(jid)
+            if rotation_dof is None:
+                raise ValueError(f"Knotenmoment an Gelenk {jid} ist nicht eindeutig zuordenbar")
+            F[rotation_dof] += mz
 
     # Boundary conditions
     sup_map     = {s["joint_id"]: s["support_type"] for s in supports_list}
     fixed_dofs  = set()
     for jid, stype in sup_map.items():
-        fixed_dofs.add(ux_dof[jid]) if stype in ("pin", "fixed") else None
-        fixed_dofs.add(uy_dof[jid]) if stype in ("pin", "roller", "fixed") else None
-        if stype == "roller":
-            # roller fixes y only; also un-fix x if accidentally added
-            fixed_dofs.discard(ux_dof[jid])
+        if stype in ("pin", "fixed", "roller_x"):
+            fixed_dofs.add(ux_dof[jid])
+        if stype in ("pin", "fixed", "roller", "roller_y"):
+            fixed_dofs.add(uy_dof[jid])
         if stype == "fixed" and jid in jrot_dof:
             fixed_dofs.add(jrot_dof[jid])
 
@@ -295,6 +304,81 @@ def solve_frame_route():
         return jsonify({"ok": True, "bar_forces": {str(k): v for k, v in bar_forces.items()}, "reactions": reactions})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)})
+
+
+def _load_fixtures():
+    try:
+        with FIXTURES_PATH.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, list) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _save_fixtures(fixtures):
+    FIXTURES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = FIXTURES_PATH.with_suffix(".json.tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
+        json.dump(fixtures, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(tmp, FIXTURES_PATH)
+
+
+def _check_password(req) -> bool:
+    return req.headers.get("X-Settings-Password", "") == SETTINGS_PASSWORD
+
+
+@app.route("/api/fixtures", methods=["GET"])
+def list_fixtures():
+    fixtures = _load_fixtures()
+    if fixtures is None:
+        return jsonify({"ok": False, "error": "no store"})
+    return jsonify({"ok": True, "fixtures": fixtures})
+
+
+@app.route("/api/fixtures/auth", methods=["POST"])
+def fixtures_auth():
+    data = request.get_json(silent=True) or {}
+    return jsonify({"ok": data.get("password", "") == SETTINGS_PASSWORD})
+
+
+@app.route("/api/fixtures", methods=["POST"])
+def upsert_fixture():
+    if not _check_password(request):
+        return jsonify({"ok": False, "error": "wrong password"}), 403
+    data = request.get_json(silent=True) or {}
+    fixture = data.get("fixture")
+    if (
+        not isinstance(fixture, dict)
+        or not isinstance(fixture.get("id"), str)
+        or not fixture["id"]
+        or not isinstance(fixture.get("nodes"), dict)
+        or not isinstance(fixture.get("bars"), list)
+        or not isinstance(fixture.get("supports"), dict)
+        or not isinstance(fixture.get("loads"), list)
+    ):
+        return jsonify({"ok": False, "error": "invalid fixture"}), 400
+    fixtures = _load_fixtures() or []
+    for i, existing in enumerate(fixtures):
+        if existing.get("id") == fixture["id"]:
+            fixtures[i] = fixture
+            break
+    else:
+        fixtures.append(fixture)
+    _save_fixtures(fixtures)
+    return jsonify({"ok": True, "count": len(fixtures)})
+
+
+@app.route("/api/fixtures/<fid>", methods=["DELETE"])
+def delete_fixture(fid):
+    if not _check_password(request):
+        return jsonify({"ok": False, "error": "wrong password"}), 403
+    fixtures = _load_fixtures() or []
+    remaining = [f for f in fixtures if f.get("id") != fid]
+    if len(remaining) == len(fixtures):
+        return jsonify({"ok": False, "error": "not found"}), 404
+    _save_fixtures(remaining)
+    return jsonify({"ok": True, "count": len(remaining)})
 
 
 @app.route("/api/save-progress", methods=["POST"])

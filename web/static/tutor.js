@@ -6,6 +6,7 @@
 (function () {
 
 const HINT_COST = 10; // Punkte pro Tipp ab Stufe 2
+const IDLE_HELP_DELAY = 45000;
 
 class StatikTutor {
   constructor(fc) {
@@ -14,6 +15,9 @@ class StatikTutor {
     this.walkStep = 0;
     this.walkSteps = [];
     this.panel = null;
+    this.idleTimer = null;
+    this.idlePrompted = false;
+    this._activityHandler = () => this.noteActivity();
   }
 
   // ===== Panel-Lebenszyklus =====
@@ -34,6 +38,16 @@ class StatikTutor {
         <div class="tutor-actions">
           <button class="btn-back tutor-hint" type="button">Tipp (−${HINT_COST} P ab Stufe 2)</button>
           <button class="btn-back tutor-why" type="button">Warum?</button>
+          <button class="btn-back tutor-reactions" type="button">Lagerkräfte einzeichnen</button>
+          <button class="btn-back tutor-show" type="button">Im Bild zeigen</button>
+        </div>
+      </div>
+      <div class="tutor-nudge" role="status" aria-live="polite">
+        <strong>Brauchst du Hilfe?</strong>
+        <span>Ich kann dir den nächsten Ansatz direkt im System markieren.</span>
+        <div>
+          <button class="btn-accent tutor-nudge-yes" type="button">Ja, zeig mal</button>
+          <button class="btn-back tutor-nudge-no" type="button">Gerade nicht</button>
         </div>
       </div>`;
     wrap.appendChild(panel);
@@ -42,9 +56,22 @@ class StatikTutor {
     panel.querySelector('.tutor-close').onclick = () => this._toggle(false);
     panel.querySelector('.tutor-hint').onclick = () => this.nextHint();
     panel.querySelector('.tutor-why').onclick = () => this.why();
+    panel.querySelector('.tutor-reactions').onclick = () => this.toggleReactions();
+    panel.querySelector('.tutor-show').onclick = () => this.showOnCanvas();
+    panel.querySelector('.tutor-nudge-yes').onclick = () => {
+      panel.classList.remove('nudging');
+      this.showOnCanvas();
+    };
+    panel.querySelector('.tutor-nudge-no').onclick = () => panel.classList.remove('nudging');
+    window.addEventListener('pointerdown', this._activityHandler, true);
+    window.addEventListener('keydown', this._activityHandler, true);
+    this._scheduleIdle();
   }
 
   detach() {
+    clearTimeout(this.idleTimer);
+    window.removeEventListener('pointerdown', this._activityHandler, true);
+    window.removeEventListener('keydown', this._activityHandler, true);
     if (this.panel) { this.panel.remove(); this.panel = null; }
     const ov = document.getElementById('walkthrough-overlay');
     if (ov) ov.style.display = 'none';
@@ -53,7 +80,31 @@ class StatikTutor {
   _toggle(open) {
     if (!this.panel) return;
     this.panel.classList.toggle('collapsed', !open);
+    this.panel.classList.remove('nudging');
     this.panel.querySelector('.tutor-fab').classList.remove('tutor-pulse');
+  }
+
+  noteActivity() {
+    if (!this.panel) return;
+    if (this.panel.classList.contains('nudging')) this.panel.classList.remove('nudging');
+    this._scheduleIdle();
+  }
+
+  _scheduleIdle() {
+    clearTimeout(this.idleTimer);
+    if (this.idlePrompted) return;
+    this.idleTimer = setTimeout(() => this._offerIdleHelp(), IDLE_HELP_DELAY);
+  }
+
+  _offerIdleHelp() {
+    if (!this.panel || document.hidden) { this._scheduleIdle(); return; }
+    this.idlePrompted = true;
+    if (this.panel.classList.contains('collapsed')) {
+      this.panel.classList.add('nudging');
+      this.panel.querySelector('.tutor-fab').classList.add('tutor-pulse');
+    } else {
+      this._say('Brauchst du Hilfe? Ich kann Lagerkräfte einzeichnen oder den nächsten sinnvollen Schritt im System markieren.', 'tutor-info');
+    }
   }
 
   _say(text, cls = '') {
@@ -77,8 +128,49 @@ class StatikTutor {
 
   newTask() {
     this.hintLevel = 0;
+    this.idlePrompted = false;
+    this.fc.showReactions = false;
+    this.fc.tutorHighlight = null;
     this._clear();
     this._say('Neue Aufgabe! Frag mich nach einem Tipp, wenn du hängst — der erste ist gratis.', 'tutor-info');
+    this._syncReactionButton();
+    this._scheduleIdle();
+  }
+
+  toggleReactions() {
+    this._toggle(true);
+    this.fc.showReactions = !this.fc.showReactions;
+    this.fc.tutorHighlight = this.fc.showReactions
+      ? { nodes: Object.keys(this.fc.fixture.supports || {}), label: 'Auflagerreaktionen' }
+      : null;
+    this._syncReactionButton();
+    this._say(this.fc.showReactions
+      ? 'Die Auflagerkräfte sind jetzt am System eingezeichnet. Pfeilrichtung und Betrag kommen direkt aus dem Gleichgewicht des Gesamtsystems.'
+      : 'Auflagerkräfte wieder ausgeblendet.', 'tutor-info');
+    this.fc.draw();
+  }
+
+  _syncReactionButton() {
+    const btn = this.panel && this.panel.querySelector('.tutor-reactions');
+    if (!btn) return;
+    btn.textContent = this.fc.showReactions ? 'Lagerkräfte ausblenden' : 'Lagerkräfte einzeichnen';
+    btn.classList.toggle('tutor-action-active', this.fc.showReactions);
+  }
+
+  showOnCanvas() {
+    this._toggle(true);
+    const target = this._wrongOrEmptyBar();
+    if (target) {
+      this.fc.tutorHighlight = { bars: [target], label: `Nächster Schritt: Stab ${target}` };
+      this._say(`Ich habe Stab ${target} markiert. ${this._concreteHint()}`, 'tutor-hint1');
+    } else {
+      const supports = Object.keys(this.fc.fixture.supports || {});
+      this.fc.showReactions = true;
+      this.fc.tutorHighlight = { nodes: supports, label: 'Hier mit dem Gesamtsystem starten' };
+      this._syncReactionButton();
+      this._say('Starte hier: Gesamtsystem freischneiden und mit ΣFx = 0, ΣFy = 0 und ΣM = 0 die Auflagerreaktionen bestimmen.', 'tutor-hint1');
+    }
+    this.fc.draw();
   }
 
   // ===== Tipp-Engine (gestufte Hints) =====

@@ -397,7 +397,7 @@ select {
 }
 
 /* ---- STATIK-ASSISTENT (Tutor) ---- */
-.tutor-panel { position: absolute; right: 18px; bottom: 18px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; }
+.tutor-panel { position: absolute; right: 18px; bottom: 18px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
 .tutor-fab {
   width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink);
   background: var(--surface); font-size: 1.5rem; cursor: pointer;
@@ -405,6 +405,16 @@ select {
 }
 .tutor-panel.collapsed .tutor-fab { display: block; }
 .tutor-panel.collapsed .tutor-body { display: none; }
+.tutor-nudge {
+  display: none; width: min(310px, calc(100vw - 36px)); padding: 12px;
+  background: var(--surface); border: 1.5px solid var(--purple); border-radius: 9px;
+  box-shadow: var(--shadow-card); font-size: .82rem; line-height: 1.4;
+}
+.tutor-panel.collapsed.nudging .tutor-nudge { display: flex; flex-direction: column; gap: 7px; order: -1; }
+.tutor-nudge strong { color: var(--purple); font-family: var(--font-display); font-size: .95rem; }
+.tutor-nudge span { color: var(--muted); }
+.tutor-nudge > div { display: flex; gap: 7px; }
+.tutor-nudge button { flex: 1; font-size: .78rem; padding: 7px 8px; text-align: center; }
 .tutor-fab.tutor-pulse { animation: tutorpulse 1s infinite alternate; }
 @keyframes tutorpulse { from { transform: scale(1); } to { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(124,92,224,.18); } }
 .tutor-body {
@@ -423,14 +433,20 @@ select {
 .tutor-msg.tutor-ok { border-left-color: var(--green); }
 .tutor-msg.tutor-hint2 { border-left-color: var(--orange); }
 .tutor-msg.tutor-hint3 { border-left-color: var(--red); }
-.tutor-actions { display: flex; gap: 8px; }
+.tutor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tutor-actions button { flex: 1; font-size: .8rem; padding: 7px 8px; }
+.tutor-actions .tutor-reactions,
+.tutor-actions .tutor-show { border-color: var(--purple); color: var(--purple); }
+.tutor-actions .tutor-action-active { background: #F0ECFF; font-weight: 700; }
 .tutor-result { display: flex; gap: 8px; }
 .tutor-result button { flex: 1; font-size: .82rem; padding: 8px 8px; }
 .walk-head { display: flex; justify-content: space-between; align-items: center; }
 
 /* ---- SCHNITT-TOOL ---- */
-.fc-cut-active { background: #FDECEC !important; border-color: var(--red) !important; color: var(--red); font-weight: 700; }
+.fc-cut-active {
+  background: #FDECEC !important; border-color: var(--red) !important; color: var(--red); font-weight: 700;
+  box-shadow: 0 0 0 3px rgba(217,83,79,.14);
+}
 
 /* ---- SCOREBOARD ---- */
 .scoreboard-banner { cursor: pointer; transition: border-color .15s; }
@@ -485,3 +501,49 @@ select {
   .inertia-side { border-left: none; border-top: 1.5px solid var(--border); }
   .cheatsheet-panel { top: 60px; bottom: 0; width: 100vw; border-radius: 10px 10px 0 0; }
 }
+
+/* ---- Einstellungen: Fachwerk-Datenbank ---- */
+.settings-gate {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+}
+.settings-gate-box {
+  background: var(--surface); border: 1.5px solid var(--ink); border-radius: 10px;
+  box-shadow: var(--shadow-card); padding: 36px 44px; text-align: center; max-width: 380px;
+}
+.settings-gate-icon { font-size: 2.2rem; margin-bottom: 8px; }
+.settings-gate-box h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.settings-gate-box p { margin: 0 0 18px; color: var(--muted); font-size: .88rem; }
+.settings-gate-box input {
+  display: block; width: 100%; box-sizing: border-box; margin-bottom: 12px;
+  padding: 10px 12px; font-size: 1rem; border: 1.5px solid var(--line);
+  border-radius: 6px; background: var(--paper); color: var(--ink);
+}
+.settings-gate-box input:focus { outline: none; border-color: var(--ink); }
+.settings-gate-error { color: #D9534F; font-size: .85rem; min-height: 1.2em; margin-top: 10px; }
+
+.settings-toolbar {
+  display: flex; align-items: center; gap: 16px; padding: 18px 24px 6px;
+}
+.settings-info { color: var(--muted); font-size: .88rem; }
+.settings-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px; padding: 16px 24px 32px;
+}
+.fixture-card {
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.fixture-card:hover { border-color: var(--ink); box-shadow: var(--shadow-card); }
+.fixture-preview {
+  position: static; /* globale canvas-Regel (absolute) überschreiben */
+  width: 100%; height: 130px; display: block; background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.fixture-card-body { padding: 10px 14px; flex: 1; }
+.fixture-card-title { font-weight: 700; font-size: .92rem; }
+.fixture-card-meta { color: var(--muted); font-size: .78rem; margin-top: 3px; }
+.fixture-card-actions {
+  display: flex; gap: 8px; padding: 0 14px 12px;
+}
+.fixture-card-actions .btn-tool { flex: 1; }
+.fixture-delete:hover { border-color: #D9534F; color: #D9534F; }

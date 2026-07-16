@@ -66,11 +66,13 @@ def solve_truss(model: TrussModel) -> TrussSolveResult:
     for bar in model.bars:
         unknown_names.append(f"bar:{bar.bar_id}")
     for support in model.supports:
-        if support.support_type in {"pin", "fixed"}:
+        if support.support_type in {"pin", "pin_wall", "fixed"}:
             unknown_names.append(f"rx:{support.joint_id}")
             unknown_names.append(f"ry:{support.joint_id}")
-        elif support.support_type == "roller":
+        elif support.support_type in {"roller", "roller_y"}:
             unknown_names.append(f"ry:{support.joint_id}")
+        elif support.support_type == "roller_x":
+            unknown_names.append(f"rx:{support.joint_id}")
         else:
             raise ValueError(f"Unsupported support type: {support.support_type}")
 
@@ -119,11 +121,13 @@ def solve_truss(model: TrussModel) -> TrussSolveResult:
     for support in model.supports:
         row_x = 2 * joint_index[support.joint_id]
         row_y = row_x + 1
-        if support.support_type in {"pin", "fixed"}:
+        if support.support_type in {"pin", "pin_wall", "fixed"}:
             matrix[row_x][unknown_index[f"rx:{support.joint_id}"]] = 1.0
             matrix[row_y][unknown_index[f"ry:{support.joint_id}"]] = 1.0
-        elif support.support_type == "roller":
+        elif support.support_type in {"roller", "roller_y"}:
             matrix[row_y][unknown_index[f"ry:{support.joint_id}"]] = 1.0
+        elif support.support_type == "roller_x":
+            matrix[row_x][unknown_index[f"rx:{support.joint_id}"]] = 1.0
 
     solution = _solve_linear_system(matrix, rhs)
     values = dict(zip(unknown_names, solution))

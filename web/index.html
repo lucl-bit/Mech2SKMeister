@@ -74,7 +74,7 @@
       </div>
       <div class="card-accent" style="background:#7C5CE0"></div>
       <h2>Fachwerk Profi <span class="badge-new">Neu</span></h2>
-      <p>Komplexere Fachwerke: Stabkräfte bestimmen, Nullstäbe finden. Jetzt mit 14 Prüfungsaufgaben aus Altprüfungen 2020–2023.</p>
+      <p>Prüfungsgetreue Tragwerke: N-, Q- und M-Verläufe zeichnen. Mit 14 exakt nachgebauten Systemen – hauptsächlich aus Teil C der Basisprüfungen 2017–2023.</p>
       <button class="btn-accent" style="background:#7C5CE0">Starten</button>
     </div>
 
@@ -119,7 +119,7 @@
       <button class="btn-accent" style="background:#11A8B5">Starten</button>
     </div>
 
-    <div class="card mode-card" onclick="App.showTrussBuilder()">
+    <div class="card mode-card" onclick="App.showTrussBuilder(null)">
       <span class="mode-letter">E</span>
       <div class="card-icon">
         <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
@@ -139,6 +139,22 @@
       <h2>Fachwerk bauen</h2>
       <p>Knoten setzen, Stäbe verbinden, Lager und Lasten ergänzen. Stabkräfte berechnen.</p>
       <button class="btn-accent" style="background:#2E9D62">Builder öffnen</button>
+    </div>
+
+    <div class="card mode-card" onclick="App.showSettings()">
+      <span class="mode-letter">F</span>
+      <div class="card-icon">
+        <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+          <rect x="52" y="40" width="36" height="30" rx="5" fill="none" stroke="#6B7A90" stroke-width="3"/>
+          <path d="M58 40 v-8 a12 12 0 0 1 24 0 v8" fill="none" stroke="#6B7A90" stroke-width="3"/>
+          <circle cx="70" cy="53" r="4" fill="#6B7A90"/>
+          <line x1="70" y1="56" x2="70" y2="63" stroke="#6B7A90" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-accent" style="background:#6B7A90"></div>
+      <h2>Einstellungen</h2>
+      <p>Fachwerk-Datenbank verwalten: Prüfungsaufgaben ansehen, korrigieren, löschen oder neue hinzufügen.</p>
+      <button class="btn-accent" style="background:#6B7A90">Öffnen 🔒</button>
     </div>
 
   </div>
@@ -297,6 +313,7 @@
       <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.clear()">Leeren</button>
       <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.validate()">System prüfen</button>
       <button class="btn-tool btn-solve" onclick="App.trussBuilder && App.trussBuilder.solve()">Berechnen</button>
+      <button class="btn-tool btn-solve" id="btn-save-fixture" style="display:none" onclick="App.trussBuilder && App.trussBuilder.saveToServer()">💾 In Datenbank speichern</button>
       <!-- dev-only buttons hidden
       <button class="btn-tool btn-mode" id="btn-edit-solution" onclick="App.trussBuilder && App.trussBuilder.toggleEditMode()">✏ Beanspruchung bearbeiten</button>
       <button class="btn-tool" onclick="App.trussBuilder && App.trussBuilder.exportToCollection()">+ Zur Sammlung</button>
@@ -316,6 +333,42 @@
   </div>
   <div class="statusbar">
     <span id="builder-status">Werkzeug wählen und im Raster klicken.</span>
+  </div>
+</div>
+
+<!-- ===== SETTINGS VIEW ===== -->
+<div id="settings-view" class="view" style="display:none; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="App.showMenu()">← Menü</button>
+      <div>
+        <div class="topbar-title">Einstellungen — Fachwerk-Datenbank</div>
+        <div class="topbar-sub">Prüfungsaufgaben ansehen, korrigieren, löschen oder neue hinzufügen.</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-back" onclick="Settings.logout()">🔒 Sperren</button>
+    </div>
+  </div>
+
+  <div id="settings-gate" class="settings-gate" style="display:none;">
+    <div class="settings-gate-box">
+      <div class="settings-gate-icon">🔒</div>
+      <h2>Passwort erforderlich</h2>
+      <p>Dieser Bereich verändert die Aufgaben-Datenbank für alle Spielmodi.</p>
+      <input type="password" id="settings-password" placeholder="Passwort"
+             onkeydown="if(event.key==='Enter')Settings.login()">
+      <button class="btn-accent" onclick="Settings.login()">Entsperren</button>
+      <div id="settings-gate-error" class="settings-gate-error"></div>
+    </div>
+  </div>
+
+  <div id="settings-content" style="display:none; flex:1; overflow-y:auto;">
+    <div class="settings-toolbar">
+      <button class="btn-accent" style="background:#2E9D62" onclick="Settings.addNew()">+ Neues Fachwerk</button>
+      <span id="settings-info" class="settings-info"></span>
+    </div>
+    <div id="settings-list" class="settings-list"></div>
   </div>
 </div>
 
@@ -403,6 +456,7 @@
 <script src="/static/theme.js"></script>
 <script src="/static/draw_utils.js"></script>
 <script src="/static/scoreboard.js"></script>
+<script src="/static/settings.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/diagram_game.js"></script>
 <script src="/static/frame_fixtures.js"></script>
