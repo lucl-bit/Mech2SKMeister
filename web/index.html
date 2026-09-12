@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <title>Mech2 Beanspruchungsmeister</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
 
@@ -453,17 +453,22 @@
   </div>
 </div>
 
-<script src="/static/theme.js"></script>
-<script src="/static/draw_utils.js"></script>
-<script src="/static/scoreboard.js"></script>
-<script src="/static/settings.js"></script>
-<script src="/static/app.js"></script>
-<script src="/static/diagram_game.js"></script>
-<script src="/static/frame_fixtures.js"></script>
-<script src="/static/tutor.js"></script>
-<script src="/static/frame_challenge.js"></script>
-<script src="/static/truss_builder.js"></script>
-<script src="/static/inertia_fixtures.js"></script>
-<script src="/static/inertia_lab.js"></script>
+<!-- Statischer Betrieb: Loeser im Browser statt Flask-Backend -->
+<script src="static/solver_linalg.js"></script>
+<script src="static/solver_truss.js"></script>
+<script src="static/solver_frame.js"></script>
+<script src="static/api_local.js"></script>
+<script src="static/theme.js"></script>
+<script src="static/draw_utils.js"></script>
+<script src="static/scoreboard.js"></script>
+<script src="static/settings.js"></script>
+<script src="static/app.js"></script>
+<script src="static/diagram_game.js"></script>
+<script src="static/frame_fixtures.js"></script>
+<script src="static/tutor.js"></script>
+<script src="static/frame_challenge.js"></script>
+<script src="static/truss_builder.js"></script>
+<script src="static/inertia_fixtures.js"></script>
+<script src="static/inertia_lab.js"></script>
 </body>
 </html>

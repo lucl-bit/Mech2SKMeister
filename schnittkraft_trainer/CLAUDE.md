@@ -20,6 +20,19 @@ Ein Lernspiel für Technische Mechanik / Baustatik. Studenten trainieren N-, Q- 
 - **Starten (alte Tkinter-GUI):** `python3 -m schnittkraft_trainer.app --gui`
 - **Tests:** `python3 -m unittest discover schnittkraft_trainer/tests`
 
+## Auslieferung: statisch auf GitHub Pages
+
+Die App läuft öffentlich ohne Server: https://lucl-bit.github.io/Mech2SKMeister/
+Die Löser sind nach JavaScript portiert, Aufgaben und Fixtures sind vorgeneriert.
+
+**Regel:** Nach jeder Änderung an Fixtures, Generatoren oder Lösern
+`python3 tools/build_static.py` laufen lassen und `web/data/` plus
+`tests_static/golden.json` mitcommitten — sonst schlägt der CI-Job fehl.
+
+Python bleibt die Referenz für die Mechanik; `tests_static/solver.test.js`
+vergleicht die JS-Portierung gegen die Python-Ergebnisse. Einzelheiten:
+`docs/statischer-betrieb.md`.
+
 ## Ordnerstruktur
 
 ```

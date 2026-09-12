@@ -1,0 +1,62 @@
+name: Tests und Deploy zu GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # Erst pruefen, dann veroeffentlichen: die JS-Loeser muessen die Ergebnisse
+  # der Python-Loeser treffen (tests_static/golden.json), sonst kein Deploy.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt
+
+      - name: Python-Tests
+        run: python -m unittest discover -s schnittkraft_trainer/tests -t .
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Golden-Vergleich JS gegen Python
+        run: node --test tests_static/solver.test.js
+
+      - name: Statische Daten sind aktuell
+        run: |
+          python tools/build_static.py --seeds 40
+          if ! git diff --quiet -- web/data tests_static/golden.json; then
+            echo "::error::web/data oder golden.json weichen ab. Bitte 'python3 tools/build_static.py' laufen lassen und committen."
+            git diff --stat -- web/data tests_static/golden.json
+            exit 1
+          fi
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
