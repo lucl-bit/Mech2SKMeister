@@ -51,9 +51,16 @@ JS-Portierung dagegen (Toleranz 1e-9 relativ).
 ```bash
 python3 -m unittest discover -s schnittkraft_trainer/tests -t .   # 46 Tests
 node --test tests_static/solver.test.js                           # 84 Tests
+python3 tools/check_golden.py                                     # golden.json aktuell?
 ```
 
-Beides läuft auch im CI, vor jedem Deploy.
+Alles drei läuft auch im CI, vor jedem Deploy.
+
+`golden.json` wird mit Toleranz geprüft, nicht bit-exakt: numpy nutzt je
+Plattform ein anderes BLAS (Apple Accelerate auf dem Mac, OpenBLAS auf den
+Actions-Runnern), `np.linalg.solve` weicht dadurch in der letzten Stelle ab.
+Die vorgenerierten Daten unter `web/data/` sind dagegen streng deterministisch
+und werden bit-genau verglichen.
 
 ## Grenzen
 

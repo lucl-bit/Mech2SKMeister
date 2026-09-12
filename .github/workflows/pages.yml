@@ -32,17 +32,25 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Golden-Vergleich JS gegen Python
         run: node --test tests_static/solver.test.js
 
-      - name: Statische Daten sind aktuell
+      # Golden-Werte mit Toleranz pruefen, nicht bit-exakt: numpy nutzt je
+      # Plattform ein anderes BLAS, np.linalg.solve weicht in der letzten
+      # Stelle ab (macOS Accelerate gegen OpenBLAS auf dem Runner).
+      - name: Golden-Werte passen zu den Python-Loesern
+        run: python tools/check_golden.py
+
+      # Die vorgenerierten Daten sind dagegen streng deterministisch und
+      # muessen bit-genau zum eingecheckten Stand passen.
+      - name: Vorgenerierte Daten sind aktuell
         run: |
           python tools/build_static.py --seeds 40
-          if ! git diff --quiet -- web/data tests_static/golden.json; then
-            echo "::error::web/data oder golden.json weichen ab. Bitte 'python3 tools/build_static.py' laufen lassen und committen."
-            git diff --stat -- web/data tests_static/golden.json
+          if ! git diff --quiet -- web/data; then
+            echo "::error::web/data weicht ab. Bitte 'python3 tools/build_static.py' laufen lassen und web/data committen."
+            git diff --stat -- web/data
             exit 1
           fi
 
