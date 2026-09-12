@@ -15,12 +15,10 @@
 
   /* Laeuft ein echtes Backend (lokal: python3 server.py), soll es zustaendig
    * bleiben - nur so kann die Fixture-Datenbank weiter bearbeitet werden.
-   * Auf GitHub Pages antwortet /api/fixtures mit 404, dann uebernimmt der Shim.
-   * Die Probe startet beim Laden und ist vor der ersten Nutzeraktion fertig. */
-  const backendAvailable = originalFetch(new URL('api/fixtures', document.baseURI).href,
-    { method: 'GET', headers: { Accept: 'application/json' } })
-    .then((resp) => resp.ok && (resp.headers.get('content-type') || '').includes('json'))
-    .catch(() => false);
+   * Flask setzt dafuer window.__SK_BACKEND__ beim Ausliefern der Seite (siehe
+   * index() in server.py). Auf GitHub Pages und jedem anderen statischen
+   * Server fehlt der Marker, dann uebernimmt der Shim. */
+  const backendAvailable = window.__SK_BACKEND__ === true;
 
   function dataUrl(name) {
     return new URL(`data/${name}`, document.baseURI).href;
@@ -134,7 +132,7 @@
     } catch (err) { /* relative Pfade unveraendert pruefen */ }
 
     if (!pathname.includes('/api/')) return originalFetch(input, init);
-    if (await backendAvailable) return originalFetch(input, init);
+    if (backendAvailable) return originalFetch(input, init);
 
     const key = routeKey(method, pathname);
 

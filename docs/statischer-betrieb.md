@@ -22,9 +22,10 @@ kein Flask dahinter steht.
 | `POST/DELETE /api/fixtures…` | schrieb auf Platte | lehnt ab, Hinweis auf lokale Pflege |
 | `POST /api/save-progress` | schrieb JSON auf Platte | `localStorage` |
 
-`api_local.js` prüft beim Laden, ob ein echtes Backend antwortet. Läuft lokal
-`python3 server.py`, bleibt Flask zuständig — nur so lässt sich die
-Fixture-Datenbank weiter bearbeiten.
+Läuft lokal `python3 server.py`, bleibt Flask zuständig — nur so lässt sich die
+Fixture-Datenbank bearbeiten. Erkannt wird das über `window.__SK_BACKEND__`:
+Flask setzt den Marker beim Ausliefern von `index.html` (siehe `index()` in
+`server.py`), auf Pages fehlt er und der Shim übernimmt.
 
 ## Neue Prüfungsaufgabe aufnehmen
 

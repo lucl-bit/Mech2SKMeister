@@ -47,7 +47,14 @@ app = Flask(
 
 @app.route("/")
 def index():
-    return send_from_directory(str(WEB_ROOT), "index.html")
+    # Marker fuer web/static/api_local.js: hier steht ein echtes Backend bereit,
+    # der Browser-Shim soll sich zurueckhalten. Ohne diesen Marker (GitHub Pages
+    # oder ein beliebiger statischer Server) uebernimmt der Shim.
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    marker = "<head>\n  <script>window.__SK_BACKEND__ = true;</script>"
+    if "<head>" not in html:
+        raise RuntimeError("index.html hat kein <head> - Backend-Marker kann nicht gesetzt werden")
+    return html.replace("<head>", marker, 1)
 
 
 @app.route("/api/conventions")
